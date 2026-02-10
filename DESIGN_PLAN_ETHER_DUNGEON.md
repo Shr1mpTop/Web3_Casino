@@ -1,74 +1,56 @@
 # ⚔️ Ether Dungeon: Endless Siege (无尽地牢：围攻) - 游戏设计与架构文档
 
-**版本**: v1.0  
+**版本**: v1.1 (针对 SC6107 课程要求优化版)  
 **日期**: 2026-02-10  
 **类型**: Web3 GameFi / Roguelike Auto-Battler  
-**兼容链**: EVM (Ethereum, Arbitrum, Base) & Solana (可选扩展)
+**相关课程**: SC6107 - Blockchain Development Fundamentals (Part 2)
 
 ---
 
-## 1. 🎯 项目愿景与设计理念
+## 1. 🎯 项目愿景与课程要求对标 (Compliance Matrix)
 
-本项目旨在复现并创新一个基于区块链技术的 **PvE 生存闯关游戏**。结合 Roguelike 的高风险博弈与自走棋的策略性，满足区块链课程开发要求（可验证随机数、代币经济、NFT），同时提供通过策略影响结果的深度游戏体验。
+本项目旨在构建一个**可证明公平 (Provably Fair)** 的链上闯关平台。设计方案严格遵循 SC6107 课程的开发要求：
 
-### 核心体验 (Core Loop)
-
-**"贪婪是唯一的敌人。"**
-
-玩家带领一支初始军团进入无限深渊。每通过一关，奖金池叠加，敌人变强。玩家需要在每一关结束后做出抉择：
-
-- **撤退 (Cash Out)**：安全带走当前奖金。
-- **继续 (Next Level)**：冒着本局归零的风险，博取更高倍率的收益。
+| 课程要求                          | 我们的实现方案 (Ether Dungeon)                                                                                                                                                                            |
+| :-------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Core 1: Verifiable Randomness** | 集成 **Chainlink VRF V2.5**。使用“请求-回调”模式生成初始手牌和随机事件，确保“地牢生成”不可预测且无法被 MEV 操纵。                                                                                         |
+| **Core 2: Two Game Types**        | **1. 策略博弈 (Card Strategy)**: 核心的自走棋闯关模式 (Auto-Battler)。<br>**2. 概率博弈 (Dice/Lottery)**: 嵌入在地牢中的“命运房间 (Room of Fate)”，纯粹基于概率的风险/奖励骰子游戏。                      |
+| **Core 3: Betting & Treasury**    | **国库模型**: 玩家入场费进入奖池 (Jackpot)。<br>**抽水 (House Edge)**: 5% 入场费自动划转至开发者金库。<br>**代币支持**: 支持 ETH 及 ERC-20 (USDC)。                                                       |
+| **Core 4: Anti-Cheating**         | **防 MEV**: 采用两步交易 (Commit-Reveal)。玩家先提交 `startGame` 交易并锁定资金，随后 VRF 回调才揭示结果。攻击者无法通过预览随机数来撤单。 <br>**链上验证**: 所有战斗逻辑在链上或通过 ZK 验证，防止篡改。 |
+| **Bonus: Advanced Features**      | **NFT 集成**: 幸存的 MVP 角色可铸造为 ERC-721。<br>**排行榜**: 链上记录最高层数玩家。                                                                                                                     |
 
 ---
 
 ## 2. 🎮 游戏策划方案 (Game Design)
 
-### 2.1 游戏流程
+### 2.1 核心体验 loop
 
-1.  **入场 (Entry)**：
-    - 玩家支付稳定币（如 USDT/USDC）作为门票（本金）。
-    - 本金进入游戏的 **奖金池 (Jackpot)**。
-    - 调用 **Chainlink VRF** 获取随机种子。
+**"贪婪是唯一的敌人。"** — 玩家带领军团进入无限深渊。每通过一关，奖金池叠加。玩家需要在每一关结束后做出抉择：
 
-2.  **招募 (Recruit)**：
-    - 根据随机种子，系统从数据库中抽取这局游戏的初始兵力（例如 3 个单位）。
-    - _注：卡牌属性固定，ID 随机。例：抽到ID#10 (兽人战士)，ID#05 (弓箭手)。_
+- **撤退 (Cash Out)**：安全带走当前奖金。
+- **继续 (Next Level)**：冒着本局归零的风险，博取更高倍率收益。
 
-3.  **闯关战斗 (The Siege)**：
-    - **排兵布阵**：玩家在前端拖拽调整单位站位（队列顺序）。
-    - **自动对撞**：提交阵容上链，与当前关卡的 AI 敌人队列进行自动战斗。
-    - **判定**：
-      - **全灭**：闯关失败，奖金清零，Session 结束。
-      - **存活**：闯关成功，当前奖金池增加系数奖励。存活兵力保留血量进入下一关。
+### 2.2 双重游戏模式详解
 
-4.  **休整与抉择 (Rest & Choice)**：
-    - 每通过特定关卡（Level 1, 2, 3...）：
-    - 玩家可选择 **结算离场** 或 **进入下一层**。
-    - **事件 (Events)**：在特定层数提供“花费奖金购买补给”或“复活单位”的机会。
+#### 模式 A：无尽围攻 (Main Mode - Card Strategy)
 
-### 2.2 战斗机制 (Battle Mechanics)
+- **流程**：
+  1.  **招募**：调用 VRF 随机抽取 3 个兵种 ID（如 #10 兽人, #05 弓手）。
+  2.  **布阵**：玩家根据敌方情报，调整自己 3 个单位的站位顺序。
+  3.  **战斗**：基于确定性算法的“队列对冲”。即 `My[0]` vs `Enemy[0]`，死者退场，生者继续。
+- **策略点**：利用兵种属性（坦克在前，输出在后）来最小化战损。
 
-采用类似《炉石传说：酒馆战棋》的简化版 **“队列对撞”** 机制，适应 EVM 计算成本。
+#### 模式 B：命运轮盘 (Event Mode - Dice Game)
 
-- **属性**：攻击力 (ATK), 生命值 (HP)。
+- **触发机制**：每 3 层（Level 3, 6, 9...）必须触发一次。
+- **玩法**：这是一个纯概率的骰子游戏，模拟“宝箱怪”或“神庙祈祷”。
 - **规则**：
-  1.  双方单位排成一列 (Array)。
-  2.  `玩家[0]` 与 `敌方[0]` 同时攻击对方。
-  3.  `HP_new = HP_old - Enemy_ATK`。
-  4.  HP <= 0 的单位死亡（移出队列）。
-  5.  幸存者继续与对方下一位单位战斗，直到一方队列为空。
-- **策略点**：
-  - **肉盾在前**：放置高防低攻单位吸收伤害。
-  - **输出在后**：保护高攻脆皮单位收割残局。
-
-### 2.3 资产系统 (Assets)
-
-- **卡牌 (Cards)**：
-  - 在游戏过程中，卡牌仅为 Session 中的数据（虚拟资产）。
-  - **铸造 (Mint)**：仅当玩家选择结算且达成特定成就时，允许付费将幸存的“MVP卡牌”铸造成真正的 ERC-721 NFT，用作纪念或在未来对局中作为特殊佣兵。
-- **卡牌数据库 (Registry)**：
-  - 卡牌属性（攻防、种族）存储在链上数据库中，而非每次随机生成。保证了游戏的平衡性和可调整性。
+  - 请求一次新的 VRF 随机数 (1-100)。
+  - **1-15 (大凶)**：遭到诅咒，扣除 25% 累计奖金。
+  - **16-50 (平庸)**：获得少量补给（回复 10% HP）。
+  - **51-90 (吉)**：奖金池直接翻倍 (x1.2 Multiplier)。
+  - **91-100 (大吉)**：全队复活 + 获得稀有装备（临时 Buff）。
+- **设计目的**：满足课程关于“Dice/Lottery”类型的要求，增加纯运气成分的刺激感。
 
 ---
 
@@ -78,96 +60,74 @@
 
 - **智能合约**: Solidity (Foundry 框架)
 - **前端**: Next.js + RainbowKit + Wagmi
-- **预言机**: Chainlink VRF V2.5 (生成随机关卡和初始手牌)
-- **合约标准**: ERC-20 (用于支付), ERC-721 (用于纪念卡牌)
+- **预言机**: Chainlink VRF V2.5
+- **网络**: Sepolia Testnet (EVM)
 
-### 3.2 智能合约模块
-
-我们需要开发以下三个核心合约：
-
-#### A. `CardRegistry.sol` (配置中心)
-
-- **职责**：存储所有兵种的基础属性。
-- **数据结构**：
-  ```solidity
-  struct UnitStats {
-      string name;
-      uint16 baseAtk;
-      uint16 baseHp;
-      // uint8 abilityId; // 预留技能ID
-  }
-  mapping(uint256 => UnitStats) public unitLibrary;
-  ```
-- **特点**：类似查表法，极大降低 Gas，只需存储 ID。
-
-#### B. `DungeonEngine.sol` (核心逻辑)
-
-- **职责**：处理游戏循环、战斗计算、资金管理。
-- **核心函数**：
-  - `startGame(uint256 amount)`: 质押代币 -> 请求 VRF。
-  - `fulfillRandomWords(...)`: Chainlink 回调 -> 初始化 Session (玩家 ID 列表)。
-  - `battle(uint256[] memory squadIndices)`: 玩家提交站位 -> 链上计算战斗 -> 更新状态 (Level++, HP--)。
-  - `cashOut()`: 结算 -> 发送奖励 -> 销毁 Session。
-
-#### C. `DungeonNFT.sol` (战利品)
-
-- **职责**：标准的 ERC-721。
-- **交互**：只有 `DungeonEngine` 有权限调用 `mint`。
-
-### 3.3 数据流图 (Data Flow)
+### 3.2 智能合约架构图
 
 ```mermaid
-sequenceDiagram
-    participant Player
-    participant Client as 前端/客户端
-    participant Engine as DungeonContract
-    participant Oracle as Chainlink VRF
-    participant DB as CardRegistry
+graph TD
+    User[玩家] -->|1. startGame Pay ETH| Engine[DungeonEngine.sol]
+    Engine -->|2. requestRandomWords| VRF[Chainlink VRF]
+    VRF -->|3. fulfillRandomWords| Engine
 
-    Note left of Player: 阶段一：入场
-    Player->>Engine: startGame(10 USDT)
-    Engine->>Oracle: requestRandomness()
-    Oracle-->>Engine: return [RandomSeed]
-    Engine->>Engine: 解析Seed -> 获得初始兵种IDs [1, 5, 8]
+    Engine -->|4. Get Unit Stats| Registry[CardRegistry.sol]
+    Registry -->|Return ATK/HP| Engine
 
-    Note left of Player: 阶段二：战斗循环
-    Client->>Engine: getSessionData()
-    Engine-->>Client: 返回 IDs [1, 5, 8]
-    Client->>DB: 查询 IDs 属性与图片
-    Player->>Client: 拖拽兵种排序 (排兵布阵)
-    Client->>Engine: executeBattle(order=[1, 8, 5])
-    Engine->>Engine: 生成本关敌人 -> 计算对撞 -> 更新剩余血量
-    Engine-->>Client: Emit BattleLog (用于回放动画)
+    User -->|5. executeBattle| Engine
+    Engine -->|6. Mint (Optional)| NFT[HeroNFT.sol]
 
-    Note left of Player: 阶段三：结算
-    Player->>Engine: cashOut() (见好就收)
-    Engine->>Player: 转账奖金池余额
+    subgraph Data Storage
+        Registry
+    end
+
+    subgraph Core Logic
+        Engine
+    end
 ```
+
+### 3.3 关键技术难点解决方案
+
+#### Q1: 如何防止 VRF 回调的 Gas 限制？
+
+- **方案**：我们将逻辑拆分。
+  - `fulfillRandomWords` 只负责将随机数保存到 `session.randomSeed` 并将状态设为 `READY`。它不做复杂的逻辑计算。
+  - 复杂的兵种生成逻辑放在用户调用的 `reveal` 或 `battle` 函数中，用户自己支付计算 Gas。
+
+#### Q2: 如何防止 MEV (抢跑/三明治攻击)?
+
+- **方案**：**Commit-Reveal 变体**。
+  - 玩家下注时，资金已被锁定在合约中。
+  - 随机数生成是异步的。当 VRF 回调时，结果已定。
+  - 玩家无法在看到随机数不满意后撤回资金，因为 `cancelGame` 只有在 VRF 超时未响应（如24小时）后才允许调用。
+
+#### Q3: 庄家优势 (House Edge) 如何设计？
+
+- **方案**：
+  1.  **入场费抽水**：固定 5%。
+  2.  **赔率控制**：关卡难度的数值设计使得玩家获胜概率随层数递减，且长期期望回报率略低于 100%（例如 98%），确保奖池长期可持续。
 
 ---
 
-## 4. 📅 开发路线图 (Roadmap)
+## 4. 📅 开发计划 (Implementation Plan)
 
-### Phase 1: 原型与核心逻辑 (Core Logic)
+### Phase 1: 核心合约 (Week 1)
 
-- [ ] 搭建 Foundry 开发环境。
-- [ ] 编写 `CardRegistry` 并录入 10 种基础卡牌数据。
-- [ ] 编写 `DungeonEngine` 的核心战斗算法（纯 Solidity 实现 `pvp_simulation`）。
-- [ ] 编写单元测试验证战斗逻辑的正确性（确保不会 Gas 超标）。
+- [ ] `CardRegistry.sol`: 录入 5-10 种单位属性。
+- [ ] `DungeonEngine.sol`: 实现 `battle(uint[] squad)` 纯逻辑，测试战斗算法正确性。
 
-### Phase 2: 链上集成 (Integration)
+### Phase 2: 集成与随机性 (Week 2)
 
-- [ ] 集成 Chainlink VRF，实现真正的随机抽卡。
-- [ ] 集成 ERC-20 支付网关（存取款逻辑）。
-- [ ] 完善 Session 状态管理（如何跨 Block 保存玩家进度）。
+- [ ] 集成 Chainlink VRF。
+- [ ] 实现“命运轮盘”骰子逻辑。
+- [ ] 完善资金池逻辑 (Deposit/Withdraw)。
 
-### Phase 3: 前端与体验 (Frontend & UX)
+### Phase 3: 前端与交互 (Week 3)
 
-- [ ] 脚手架搭建 (Next.js)。
-- [ ] 编写“战斗回放器”：解析链上日志，在屏幕上播放攻击动画。
-- [ ] 连接钱包与合约交互。
+- [ ] Next.js 界面开发：战场可视化（左侧我方，右侧敌方）。
+- [ ] 连接钱包，展示实时 Log。
 
-### Phase 4: 测试网发布 (Deploy)
+### Phase 4: 测试与文档 (Week 4)
 
-- [ ] 部署至 Sepolia / Arbitrum Sepolia。
-- [ ] 生成文档与演示视频。
+- [ ] 编写测试脚本 (Foundry test)。
+- [ ] 生成演示视频和文档，准备 Presentation。
