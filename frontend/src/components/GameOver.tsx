@@ -6,12 +6,14 @@ interface GameOverProps {
   battleResult: BattleResult;
   betAmount: number;
   onPlayAgain: () => void;
+  onReturnHome: () => void;
 }
 
 export const GameOver: React.FC<GameOverProps> = ({
   battleResult,
   betAmount,
   onPlayAgain,
+  onReturnHome,
 }) => {
   const {
     playerWon,
@@ -161,9 +163,14 @@ export const GameOver: React.FC<GameOverProps> = ({
           </p>
         </div>
 
-        <button className="btn-primary" onClick={onPlayAgain}>
-          🔄 Play Again
-        </button>
+        <div className="gameover-actions">
+          <button className="btn-primary" onClick={onPlayAgain}>
+            🔄 Play Again
+          </button>
+          <button className="btn-secondary" onClick={onReturnHome}>
+            🏠 Return Home
+          </button>
+        </div>
       </div>
     </div>
   );

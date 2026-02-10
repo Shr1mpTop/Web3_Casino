@@ -2,9 +2,15 @@ import React, { useState } from "react";
 
 interface GameSetupProps {
   onStartGame: (seed: string, betAmount: number) => void;
+  onOpenGallery: () => void;
+  onOpenHowToPlay: () => void;
 }
 
-export const GameSetup: React.FC<GameSetupProps> = ({ onStartGame }) => {
+export const GameSetup: React.FC<GameSetupProps> = ({
+  onStartGame,
+  onOpenGallery,
+  onOpenHowToPlay,
+}) => {
   const [seed, setSeed] = useState("");
   const [betAmount, setBetAmount] = useState(100);
 
@@ -102,6 +108,15 @@ export const GameSetup: React.FC<GameSetupProps> = ({ onStartGame }) => {
         <button className="btn-primary" onClick={handleStart}>
           ⚔️ Begin the Duel
         </button>
+
+        <div className="setup-nav-buttons">
+          <button className="btn-secondary" onClick={onOpenGallery}>
+            📖 Card Gallery
+          </button>
+          <button className="btn-secondary" onClick={onOpenHowToPlay}>
+            📜 How to Play
+          </button>
+        </div>
 
         <div className="setup-footer">
           <p>5 rounds of fate. 78 tarot cards. One destiny.</p>

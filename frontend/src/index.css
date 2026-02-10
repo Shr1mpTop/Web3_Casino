@@ -1307,3 +1307,471 @@ body {
     display: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GAME OVER ACTIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.gameover-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.gameover-actions .btn-primary,
+.gameover-actions .btn-secondary {
+  min-width: 160px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SETUP NAV BUTTONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.setup-nav-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 0.8rem;
+}
+
+.setup-nav-buttons .btn-secondary {
+  font-size: 1.05rem;
+  padding: 0.7rem 1.4rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CARD GALLERY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.gallery-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  min-height: 100vh;
+}
+
+.gallery-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.gallery-back {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.gallery-title {
+  font-family: var(--font-display);
+  font-size: 2.8rem;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+  margin: 0;
+}
+
+.gallery-subtitle {
+  color: var(--text-muted);
+  font-size: 1rem;
+  margin-top: 0.3rem;
+}
+
+.gallery-filters {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.gallery-filter-btn {
+  background: var(--bg-surface);
+  border: 1px solid #444;
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  font-family: var(--font-pixel);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gallery-filter-btn:hover {
+  border-color: var(--gold-dim);
+  color: var(--text-primary);
+}
+
+.gallery-filter-btn.active {
+  background: rgba(255, 215, 0, 0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.gallery-count {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 1.2rem;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.gallery-card {
+  background: var(--bg-surface);
+  border: 2px solid #333;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery-card:hover {
+  border-color: var(--gold-dim);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.gallery-card.major {
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.gallery-card.major:hover {
+  border-color: var(--gold);
+  box-shadow: 0 8px 24px rgba(255, 215, 0, 0.15);
+}
+
+.gallery-card.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.25);
+}
+
+.gallery-card-img {
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  object-position: top;
+}
+
+.gallery-card-name {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Detail overlay */
+.gallery-detail {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  animation: fade-in 0.25s ease;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.gallery-detail-card {
+  display: flex;
+  gap: 2rem;
+  max-width: 700px;
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid #444;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.gallery-detail-img {
+  width: 220px;
+  height: auto;
+  border-radius: var(--radius);
+  border: 2px solid #555;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.gallery-detail-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.gallery-detail-name {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--gold);
+  margin: 0;
+}
+
+.gallery-detail-type {
+  margin-bottom: 0.5rem;
+}
+
+.detail-badge {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.major-badge {
+  background: rgba(255, 215, 0, 0.15);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+}
+
+.suit-badge {
+  background: rgba(100, 220, 255, 0.1);
+  color: var(--text-primary);
+  border: 1px solid #555;
+}
+
+.gallery-detail-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.stat-key {
+  color: var(--text-muted);
+}
+
+.stat-val {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.stat-val.effect-type {
+  text-transform: capitalize;
+  color: var(--gold);
+}
+
+.gallery-detail-close {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOW TO PLAY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.howto-container {
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  min-height: 100vh;
+}
+
+.howto-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.howto-back {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.howto-title {
+  font-family: var(--font-display);
+  font-size: 2.8rem;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+  margin: 0;
+}
+
+.howto-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.howto-section {
+  background: var(--bg-surface);
+  border: 1px solid #333;
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.howto-section-title {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--text-primary);
+  margin: 0 0 0.8rem;
+}
+
+.howto-section p {
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+
+.howto-section p:last-child {
+  margin-bottom: 0;
+}
+
+.howto-cards-overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.howto-card-group {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.howto-card-group h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--gold);
+  margin: 0 0 0.5rem;
+}
+
+.howto-card-group p {
+  font-size: 0.95rem;
+}
+
+.howto-counter-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.counter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+
+.counter-emoji {
+  font-size: 1.3rem;
+}
+
+.counter-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.counter-arrow {
+  color: var(--gold);
+  font-style: italic;
+  margin: 0 0.3rem;
+}
+
+.howto-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.howto-list li {
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+.howto-list li::before {
+  content: "›";
+  position: absolute;
+  left: 0;
+  color: var(--gold);
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.howto-list li + li {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.howto-home-btn {
+  display: block;
+  margin: 2rem auto 0;
+}
+
+/* ─── Gallery & HowTo Responsive ─────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.6rem;
+  }
+
+  .gallery-detail-card {
+    flex-direction: column;
+    align-items: center;
+    padding: 1.2rem;
+  }
+
+  .gallery-detail-img {
+    width: 160px;
+  }
+
+  .gallery-title,
+  .howto-title {
+    font-size: 2rem;
+  }
+
+  .howto-cards-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .counter-item {
+    font-size: 0.85rem;
+    flex-wrap: wrap;
+  }
+}

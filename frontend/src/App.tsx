@@ -2,10 +2,12 @@ import { useState, useCallback } from "react";
 import { GameSetup } from "./components/GameSetup";
 import { BattleScene } from "./components/BattleScene";
 import { GameOver } from "./components/GameOver";
+import { CardGallery } from "./components/CardGallery";
+import { HowToPlay } from "./components/HowToPlay";
 import { SpaceBackground } from "./components/SpaceBackground";
 import { resolveBattle, BattleResult } from "./engine/battleEngine";
 
-type GamePhase = "setup" | "battle" | "gameover";
+type GamePhase = "setup" | "battle" | "gameover" | "gallery" | "howtoplay";
 
 function App() {
   const [phase, setPhase] = useState<GamePhase>("setup");
@@ -49,7 +51,13 @@ function App() {
   return (
     <div className="app">
       <SpaceBackground />
-      {phase === "setup" && <GameSetup onStartGame={handleStartGame} />}
+      {phase === "setup" && (
+        <GameSetup
+          onStartGame={handleStartGame}
+          onOpenGallery={() => setPhase("gallery")}
+          onOpenHowToPlay={() => setPhase("howtoplay")}
+        />
+      )}
 
       {phase === "battle" && battleResult && (
         <BattleScene
@@ -64,8 +72,13 @@ function App() {
           battleResult={battleResult}
           betAmount={betAmount}
           onPlayAgain={handlePlayAgain}
+          onReturnHome={handlePlayAgain}
         />
       )}
+
+      {phase === "gallery" && <CardGallery onBack={() => setPhase("setup")} />}
+
+      {phase === "howtoplay" && <HowToPlay onBack={() => setPhase("setup")} />}
     </div>
   );
 }
