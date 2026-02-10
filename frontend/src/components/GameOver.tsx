@@ -1,6 +1,6 @@
 import React from "react";
 import { BattleResult } from "../engine/battleEngine";
-import { MAX_HP } from "../engine/cardData";
+import { DIFFICULTIES } from "../engine/difficulty";
 
 interface GameOverProps {
   battleResult: BattleResult;
@@ -20,17 +20,25 @@ export const GameOver: React.FC<GameOverProps> = ({
     isDraw,
     playerFinalHp,
     enemyFinalHp,
+    playerMaxHp,
+    enemyMaxHp,
+    difficultyId,
     rounds,
     seed,
     seedHash,
   } = battleResult;
 
+  const diff = DIFFICULTIES[difficultyId];
   const resultText = isDraw ? "DRAW" : playerWon ? "VICTORY" : "DEFEAT";
   const resultClass = isDraw ? "draw" : playerWon ? "victory" : "defeat";
 
-  // Calculate payout
-  const multiplier = isDraw ? 1 : playerWon ? 2 : 0;
-  const payout = betAmount * multiplier;
+  // Calculate payout based on difficulty
+  const multiplier = isDraw
+    ? diff.drawMultiplier
+    : playerWon
+      ? diff.multiplier
+      : 0;
+  const payout = Math.floor(betAmount * multiplier);
   const profit = payout - betAmount;
 
   // Count major arcana appearances
@@ -57,17 +65,22 @@ export const GameOver: React.FC<GameOverProps> = ({
               : "The cards have spoken."}
         </div>
 
+        {/* Difficulty badge */}
+        <div className="gameover-difficulty" style={{ color: diff.color }}>
+          {diff.icon} {diff.name} — ×{diff.multiplier} Payout
+        </div>
+
         {/* Final HP comparison */}
         <div className="gameover-hp">
           <div className="hp-final player">
             <span className="hp-label">You</span>
             <span className="hp-value">
-              {playerFinalHp} / {MAX_HP}
+              {playerFinalHp} / {playerMaxHp}
             </span>
             <div className="hp-bar-mini">
               <div
                 className="hp-bar-mini-fill player"
-                style={{ width: `${(playerFinalHp / MAX_HP) * 100}%` }}
+                style={{ width: `${(playerFinalHp / playerMaxHp) * 100}%` }}
               />
             </div>
           </div>
@@ -75,12 +88,12 @@ export const GameOver: React.FC<GameOverProps> = ({
           <div className="hp-final enemy">
             <span className="hp-label">Enemy</span>
             <span className="hp-value">
-              {enemyFinalHp} / {MAX_HP}
+              {enemyFinalHp} / {enemyMaxHp}
             </span>
             <div className="hp-bar-mini">
               <div
                 className="hp-bar-mini-fill enemy"
-                style={{ width: `${(enemyFinalHp / MAX_HP) * 100}%` }}
+                style={{ width: `${(enemyFinalHp / enemyMaxHp) * 100}%` }}
               />
             </div>
           </div>
@@ -152,14 +165,20 @@ export const GameOver: React.FC<GameOverProps> = ({
             <code className="verification-value">{seedHash}</code>
           </div>
           <div className="verification-field">
+            <span className="verification-label">Difficulty</span>
+            <code className="verification-value" style={{ color: diff.color }}>
+              {diff.icon} {diff.name} (×{diff.multiplier})
+            </code>
+          </div>
+          <div className="verification-field">
             <span className="verification-label">Events</span>
             <code className="verification-value">
               {majorCount} Major Arcana appeared
             </code>
           </div>
           <p className="verification-hint">
-            Enter the same seed to replay this exact battle — every card, every
-            outcome, identical.
+            Enter the same seed + same difficulty to replay this exact battle —
+            every card, every outcome, identical.
           </p>
         </div>
 

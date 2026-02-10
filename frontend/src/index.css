@@ -389,6 +389,233 @@ body {
   margin-top: 0.3rem;
 }
 
+/* ── Difficulty Selector ─────────────────────────── */
+
+.difficulty-selector {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.difficulty-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 72px;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+}
+
+.difficulty-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.difficulty-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-3px);
+}
+
+.diff-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.diff-name {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.diff-mult {
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+/* ── Difficulty Detail Panel ─────────────────────── */
+
+.difficulty-detail {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  margin-top: 0.4rem;
+  transition: border-color 0.4s ease;
+}
+
+.diff-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.diff-detail-icon {
+  font-size: 1.3rem;
+}
+
+.diff-detail-name {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.diff-detail-mult {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.diff-detail-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.65rem;
+  line-height: 1.45;
+}
+
+.diff-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+}
+
+.diff-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.35rem 0.2rem;
+}
+
+.diff-stat-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  letter-spacing: 0.03em;
+}
+
+.diff-stat-value {
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: var(--text);
+  font-family: var(--font-display);
+}
+
+/* ── Risk Meter ─────────────────────────── */
+
+.risk-meter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.risk-meter-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.risk-meter-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.risk-meter-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Payout Preview ─────────────────────── */
+
+.payout-preview {
+  margin-top: 0.6rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.payout-preview-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.payout-preview-row.win span:last-child {
+  color: #6bff8e;
+}
+
+.payout-preview-row.draw span:last-child {
+  color: var(--gold);
+}
+
+.payout-preview-row.lose span:last-child {
+  color: #ff6b6b;
+}
+
+/* ── Start Button difficulty glow ─────────────── */
+
+.start-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.start-btn::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(218, 165, 32, 0.4),
+    rgba(218, 165, 32, 0.1),
+    rgba(218, 165, 32, 0.4)
+  );
+  z-index: -1;
+  animation: startBtnShimmer 3s ease infinite;
+}
+
+@keyframes startBtnShimmer {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ── GameOver Difficulty Badge ─────────────── */
+
+.gameover-difficulty {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.04em;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    BATTLE SCENE
    ═══════════════════════════════════════════════════════════════════════════ */

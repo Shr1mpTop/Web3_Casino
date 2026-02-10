@@ -6,6 +6,7 @@ import { CardGallery } from "./components/CardGallery";
 import { HowToPlay } from "./components/HowToPlay";
 import { SpaceBackground } from "./components/SpaceBackground";
 import { resolveBattle, BattleResult } from "./engine/battleEngine";
+import type { DifficultyId } from "./engine/difficulty";
 
 type GamePhase = "setup" | "battle" | "gameover" | "gallery" | "howtoplay";
 
@@ -14,30 +15,39 @@ function App() {
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
   const [betAmount, setBetAmount] = useState(100);
 
-  const handleStartGame = useCallback((seed: string, bet: number) => {
-    // The "Big Bang": seed determines EVERYTHING
-    const result = resolveBattle(seed);
-    setBattleResult(result);
-    setBetAmount(bet);
-    setPhase("battle");
+  const handleStartGame = useCallback(
+    (seed: string, bet: number, difficulty: DifficultyId) => {
+      // The "Big Bang": seed + difficulty determines EVERYTHING
+      const result = resolveBattle(seed, difficulty);
+      setBattleResult(result);
+      setBetAmount(bet);
+      setPhase("battle");
 
-    // Debug: log the entire battle to console for verification
-    console.group(`🔮 Battle Resolved — Seed: "${seed}"`);
-    console.log(
-      "Result:",
-      result.playerWon ? "PLAYER WINS" : result.isDraw ? "DRAW" : "ENEMY WINS",
-    );
-    console.log(
-      `Final HP — Player: ${result.playerFinalHp}, Enemy: ${result.enemyFinalHp}`,
-    );
-    result.rounds.forEach((r) => {
-      console.log(
-        `  Round ${r.round}: ${r.playerCard.name} vs ${r.enemyCard.name} → ` +
-          `Player ${r.playerHpBefore}→${r.playerHpAfter} | Enemy ${r.enemyHpBefore}→${r.enemyHpAfter}`,
+      // Debug: log the entire battle to console for verification
+      console.group(
+        `🔮 Battle Resolved — Seed: "${seed}" | Difficulty: ${difficulty}`,
       );
-    });
-    console.groupEnd();
-  }, []);
+      console.log(
+        "Result:",
+        result.playerWon
+          ? "PLAYER WINS"
+          : result.isDraw
+            ? "DRAW"
+            : "ENEMY WINS",
+      );
+      console.log(
+        `Final HP — Player: ${result.playerFinalHp}/${result.playerMaxHp}, Enemy: ${result.enemyFinalHp}/${result.enemyMaxHp}`,
+      );
+      result.rounds.forEach((r) => {
+        console.log(
+          `  Round ${r.round}: ${r.playerCard.name} vs ${r.enemyCard.name} → ` +
+            `Player ${r.playerHpBefore}→${r.playerHpAfter} | Enemy ${r.enemyHpBefore}→${r.enemyHpAfter}`,
+        );
+      });
+      console.groupEnd();
+    },
+    [],
+  );
 
   const handleBattleComplete = useCallback(() => {
     setPhase("gameover");

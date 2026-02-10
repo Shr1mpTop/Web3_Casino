@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { BattleResult, RoundResult } from "../engine/battleEngine";
-import { MAX_HP } from "../engine/cardData";
+
 import { CardDisplay } from "./CardDisplay";
 import { HealthBar } from "./HealthBar";
 import { BattleEffects, EffectTrigger } from "./BattleEffects";
@@ -41,8 +41,10 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
 }) => {
   const [currentRoundIndex, setCurrentRoundIndex] = useState(-1);
   const [phase, setPhase] = useState<Phase>("intro");
-  const [displayPlayerHp, setDisplayPlayerHp] = useState(MAX_HP);
-  const [displayEnemyHp, setDisplayEnemyHp] = useState(MAX_HP);
+  const [displayPlayerHp, setDisplayPlayerHp] = useState(
+    battleResult.playerMaxHp,
+  );
+  const [displayEnemyHp, setDisplayEnemyHp] = useState(battleResult.enemyMaxHp);
   const [hpAnimatingPlayer, setHpAnimatingPlayer] = useState(false);
   const [hpAnimatingEnemy, setHpAnimatingEnemy] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -67,20 +69,23 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
   const totalRounds = battleResult.rounds.length;
 
   // Compute intermediate HP after player attacks but before enemy attacks
-  const getHpAfterPlayerAttack = useCallback((round: RoundResult) => {
-    // Player deals damage to enemy, player heals (from player's own card effects)
-    const enemyHpAfterPlayerAtk = Math.max(
-      0,
-      Math.min(
-        MAX_HP,
-        round.enemyHpBefore - round.playerDamageDealt + round.enemyHeal,
-      ),
-    );
-    return {
-      playerHp: round.playerHpBefore, // player hasn't been hit yet
-      enemyHp: enemyHpAfterPlayerAtk,
-    };
-  }, []);
+  const getHpAfterPlayerAttack = useCallback(
+    (round: RoundResult) => {
+      // Player deals damage to enemy, player heals (from player's own card effects)
+      const enemyHpAfterPlayerAtk = Math.max(
+        0,
+        Math.min(
+          battleResult.enemyMaxHp,
+          round.enemyHpBefore - round.playerDamageDealt + round.enemyHeal,
+        ),
+      );
+      return {
+        playerHp: round.playerHpBefore, // player hasn't been hit yet
+        enemyHp: enemyHpAfterPlayerAtk,
+      };
+    },
+    [battleResult.enemyMaxHp],
+  );
 
   // Sync HP updates with damage number visibility (delay ~300ms so
   // the floating number has time to animate in before the bar starts moving)
@@ -270,7 +275,7 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
           <div className="side-label player">YOU</div>
           <HealthBar
             current={displayPlayerHp}
-            max={MAX_HP}
+            max={battleResult.playerMaxHp}
             label="You"
             side="player"
             animating={hpAnimatingPlayer}
@@ -303,7 +308,7 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
           <div className="side-label enemy">ENEMY</div>
           <HealthBar
             current={displayEnemyHp}
-            max={MAX_HP}
+            max={battleResult.enemyMaxHp}
             label="Enemy"
             side="enemy"
             animating={hpAnimatingEnemy}

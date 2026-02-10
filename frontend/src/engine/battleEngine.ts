@@ -20,6 +20,7 @@ import {
   EffectType,
 } from "./cardData";
 import { createRNG, hashString } from "./seedEngine";
+import { DifficultyConfig, DifficultyId, DIFFICULTIES } from "./difficulty";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -53,10 +54,13 @@ export interface RoundResult {
 export interface BattleResult {
   seed: string;
   seedHash: number;
+  difficultyId: DifficultyId;
   rounds: RoundResult[];
   playerWon: boolean;
   playerFinalHp: number;
   enemyFinalHp: number;
+  playerMaxHp: number;
+  enemyMaxHp: number;
   isDraw: boolean;
   totalRoundsPlayed: number;
 }
@@ -243,7 +247,11 @@ function applyMajorEffect(
 
 // ─── Main Battle Resolver ────────────────────────────────────────────────────
 
-export function resolveBattle(seedString: string): BattleResult {
+export function resolveBattle(
+  seedString: string,
+  difficultyId: DifficultyId = "normal",
+): BattleResult {
+  const diff: DifficultyConfig = DIFFICULTIES[difficultyId];
   const seedNum = hashString(seedString);
   const rng = createRNG(seedNum);
 
@@ -258,8 +266,10 @@ export function resolveBattle(seedString: string): BattleResult {
     enemyCards.push(shuffled[i * 2 + 1]);
   }
 
-  let playerHp = MAX_HP;
-  let enemyHp = MAX_HP;
+  const playerMaxHp = diff.playerStartHp;
+  const enemyMaxHp = diff.enemyStartHp;
+  let playerHp = playerMaxHp;
+  let enemyHp = enemyMaxHp;
   const rounds: RoundResult[] = [];
 
   for (let i = 0; i < TOTAL_ROUNDS; i++) {
@@ -452,8 +462,18 @@ export function resolveBattle(seedString: string): BattleResult {
       specialEffects.includes("swap_hp") ||
       specialEffects.includes("average_hp");
     if (!isDirectHpChange) {
-      enemyHp = clamp(enemyHp - pDmg + eHeal, 0, MAX_HP);
-      playerHp = clamp(playerHp - eDmg + pHeal, 0, MAX_HP);
+      // Apply difficulty damage bonuses
+      const finalPlayerDmg = Math.max(0, pDmg + diff.playerDmgBonus);
+      const finalEnemyDmg = Math.max(0, eDmg + diff.enemyDmgBonus);
+      const finalEnemyHeal = eHeal + diff.enemyHealBonus;
+
+      enemyHp = clamp(enemyHp - finalPlayerDmg + finalEnemyHeal, 0, enemyMaxHp);
+      playerHp = clamp(playerHp - finalEnemyDmg + pHeal, 0, playerMaxHp);
+
+      // Update displayed damage/heal to match actual HP changes
+      pDmg = finalPlayerDmg;
+      eDmg = finalEnemyDmg;
+      eHeal = finalEnemyHeal;
     }
 
     rounds.push({
@@ -477,10 +497,13 @@ export function resolveBattle(seedString: string): BattleResult {
   return {
     seed: seedString,
     seedHash: seedNum,
+    difficultyId,
     rounds,
     playerWon: playerHp > enemyHp,
     playerFinalHp: Math.max(playerHp, 0),
     enemyFinalHp: Math.max(enemyHp, 0),
+    playerMaxHp,
+    enemyMaxHp,
     isDraw: playerHp === enemyHp,
     totalRoundsPlayed: rounds.length,
   };
