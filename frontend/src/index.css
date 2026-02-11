@@ -1176,6 +1176,40 @@ body {
   gap: 1rem;
   margin-top: auto;
   padding-top: 1rem;
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: rgba(10, 10, 20, 0.75);
+  backdrop-filter: blur(8px);
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+}
+
+.speed-group {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.speed-btn {
+  min-width: 3.2rem;
+  text-align: center;
+  font-weight: bold;
+  color: var(--text-secondary);
+  border-color: #333;
+  transition: all var(--transition);
+}
+
+.speed-btn.active {
+  color: var(--gold) !important;
+  border-color: var(--gold-dim) !important;
+  background: rgba(212, 175, 55, 0.12);
+}
+
+.speed-btn:hover {
+  background: rgba(212, 175, 55, 0.1);
 }
 
 .click-hint {

@@ -48,6 +48,7 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
   const [hpAnimatingPlayer, setHpAnimatingPlayer] = useState(false);
   const [hpAnimatingEnemy, setHpAnimatingEnemy] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [battleSpeed, setBattleSpeed] = useState<1 | 2 | 5>(1);
   const [effectTrigger, setEffectTrigger] = useState<EffectTrigger | null>(
     null,
   );
@@ -89,7 +90,7 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
 
   // Sync HP updates with damage number visibility (delay ~300ms so
   // the floating number has time to animate in before the bar starts moving)
-  const HP_SYNC_DELAY = 300;
+  const HP_SYNC_DELAY = 300 / battleSpeed;
 
   useEffect(() => {
     if (!currentRound) return;
@@ -111,7 +112,7 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
       }, HP_SYNC_DELAY);
       return () => clearTimeout(t);
     }
-  }, [phase, currentRound, getHpAfterPlayerAttack]);
+  }, [phase, currentRound, getHpAfterPlayerAttack, HP_SYNC_DELAY]);
 
   // Auto-advance phases
   useEffect(() => {
@@ -194,7 +195,7 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
           }
           break;
       }
-    }, PHASE_DURATIONS[phase]);
+    }, PHASE_DURATIONS[phase] / battleSpeed);
 
     return () => clearTimeout(timer);
   }, [
@@ -203,6 +204,7 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
     totalRounds,
     currentRound,
     isPaused,
+    battleSpeed,
     onBattleComplete,
     getHpAfterPlayerAttack,
   ]);
@@ -365,6 +367,20 @@ export const BattleScene: React.FC<BattleSceneProps> = ({
         >
           {isPaused ? "▶ Resume" : "⏸ Pause"}
         </button>
+        <div className="speed-group">
+          {([1, 2, 5] as const).map((speed) => (
+            <button
+              key={speed}
+              className={`btn-small speed-btn ${battleSpeed === speed ? "active" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setBattleSpeed(speed);
+              }}
+            >
+              {speed}x
+            </button>
+          ))}
+        </div>
         <span className="click-hint">Click anywhere to skip</span>
       </div>
     </div>
