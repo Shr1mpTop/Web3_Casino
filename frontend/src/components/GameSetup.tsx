@@ -148,6 +148,12 @@ export const GameSetup: React.FC<GameSetupProps> = ({
                     +{potentialProfit} ETH (×{WIN_MULTIPLIER})
                   </span>
                 </div>
+                <div className="payout-preview-row draw">
+                  <span>Draw</span>
+                  <span style={{ color: "#b0b0b0" }}>
+                    Refund {betAmount} ETH
+                  </span>
+                </div>
                 <div className="payout-preview-row lose">
                   <span>Lose</span>
                   <span>-{betAmount} ETH</span>

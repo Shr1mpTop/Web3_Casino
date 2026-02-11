@@ -4,7 +4,7 @@
  */
 
 export const FATE_ECHO_ADDRESS = (import.meta.env.VITE_FATE_ECHO_CONTRACT_ADDRESS ||
-  "0x64b9c6fdd3020ceb7cfacf7bf6e95a3b0ce0d4ad") as `0x${string}`;
+  "0x441846effc4836570e80dbbb43ff041a8ea14910") as `0x${string}`;
 
 export const FATE_ECHO_ABI = [
   // ── Read Functions ──────────────────────────────────────────

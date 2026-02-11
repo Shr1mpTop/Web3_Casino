@@ -116,6 +116,7 @@ contract FateEcho is VRFConsumerBaseV2Plus {
             betAmount: msg.value,
             seed: 0,
             playerWon: false,
+            isDraw: false,
             playerFinalHp: 0,
             enemyFinalHp: 0,
             payout: 0,
