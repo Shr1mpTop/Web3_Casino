@@ -99,7 +99,7 @@
 | `vrfCoordinator` | `0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B` | Sepolia VRF v2.5 Coordinator 地址 |
 | `subscriptionId` | `你的 Subscription ID`（如 `92203...60039`） | 第二步中记录的完整数字（uint256，可能超过 20 位） |
 | `keyHash` | `0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae` | Sepolia VRF v2.5 Key Hash（完整 bytes32） |
-| `callbackGasLimit` | `500000` | VRF 回调 Gas 上限 |
+| `callbackGasLimit` | `100000` | VRF 回调 Gas 上限（优化后只需 100k） |
 
 > ⚠️ **Subscription ID 注意事项**：
 > - Subscription ID 是一个很大的 **uint256** 数字，不要尝试缩短
@@ -230,7 +230,7 @@ Remix 需要从 npm 下载 `@chainlink/contracts`。确保网络畅通，等待�
 ```
 VRF Coordinator (Sepolia v2.5):  0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B
 Key Hash (VRF v2.5):             0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae
-Callback Gas Limit:              500000
+Callback Gas Limit:              100000 (优化：从 500k 降低到 100k)
 Min Bet:                         0.001 ETH = 1000000000000000 wei
 Max Bet:                         1 ETH     = 1000000000000000000 wei
 Test Bet:                        0.01 ETH  = 10000000000000000 wei

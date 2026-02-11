@@ -67,6 +67,21 @@ uint64 constant SUBSCRIPTION_ID = YOUR_SUBSCRIPTION_ID; // 替换为你的订阅
 3. 部署合约
 4. 记录部署的合约地址
 
+#### 快速部署脚本
+使用 `contracts/deploy.js` 快速部署：
+
+1. 在 Remix 中打开 `contracts/deploy.js`
+2. 修改 `YOUR_SUBSCRIPTION_ID` 为你的订阅 ID
+3. 复制代码到 Remix 控制台运行
+4. 合约将自动部署并显示地址
+
+#### 测试合约
+使用 `contracts/test.js` 测试部署的合约：
+
+1. 修改 `CONTRACT_ADDRESS` 为你的合约地址
+2. 在 Remix 控制台运行测试脚本
+3. 脚本会自动测试基本功能并模拟一局游戏
+
 ### 3. 合约配置
 
 #### VRF 参数 (Sepolia)

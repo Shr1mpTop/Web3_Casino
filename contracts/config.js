@@ -12,8 +12,8 @@ export const VRF_CONFIG = {
   // Key Hash (v2.5)
   KEY_HASH: "0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae",
 
-  // Callback Gas Limit
-  CALLBACK_GAS_LIMIT: 500000,
+  // Callback Gas Limit (优化后只需 100k)
+  CALLBACK_GAS_LIMIT: 100000,
 
   // Minimum Confirmations
   CONFIRMATIONS: 3,

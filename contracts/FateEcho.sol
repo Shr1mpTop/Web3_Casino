@@ -130,7 +130,7 @@ contract FateEcho is VRFConsumerBaseV2Plus {
     }
 
     /**
-     * @notice VRF callback function
+     * @notice VRF callback function - 只存储 seed，节省 Gas
      * @param requestId The request ID
      * @param randomWords Array of random words
      */
@@ -139,49 +139,57 @@ contract FateEcho is VRFConsumerBaseV2Plus {
         require(game.state == GameState.Pending, "Game not pending");
         require(game.player != address(0), "Game not found");
 
-        uint256 seed = randomWords[0];
-        game.seed = seed;
+        // 只存储 seed，不做任何计算！
+        game.seed = randomWords[0];
+        game.state = GameState.Resolved;
 
-        // Resolve battle using deterministic algorithm
+        emit GameResolved(requestId, game.player, false, 0); // 占位事件
+    }
+
+    /**
+     * @notice 结算战斗并支付奖金（玩家在前端看完动画后调用）
+     * @param requestId The game request ID
+     */
+    function settleBattle(uint256 requestId) external {
+        GameResult storage game = games[requestId];
+        require(game.player == msg.sender, "Not your game");
+        require(game.state == GameState.Resolved, "Game not resolved or already settled");
+        require(game.seed != 0, "Seed not available");
+        require(game.payout == 0, "Already settled");
+
+        // 现在才计算战斗结果
         (
             bool playerWon,
             uint256 playerFinalHp,
             uint256 enemyFinalHp
-        ) = _resolveBattle(seed);
+        ) = _resolveBattle(game.seed);
 
         game.playerWon = playerWon;
         game.playerFinalHp = playerFinalHp;
         game.enemyFinalHp = enemyFinalHp;
 
-        // Calculate payout (2x bet for win, minus house edge)
-        uint256 payout = 0;
+        // 计算并立即支付
         if (playerWon) {
-            payout = (game.betAmount * 2 * (100 - HOUSE_EDGE)) / 100;
+            uint256 payout = (game.betAmount * 2 * (100 - HOUSE_EDGE)) / 100;
             game.payout = payout;
+            game.state = GameState.Paid;
+            totalPayouts += payout;
+
+            (bool success, ) = payable(msg.sender).call{value: payout}("");
+            require(success, "Transfer failed");
+
+            emit GamePaid(requestId, msg.sender, payout);
+        } else {
+            game.state = GameState.Paid; // 输了也标记为已结算
         }
-
-        game.state = GameState.Resolved;
-
-        emit GameResolved(requestId, game.player, playerWon, payout);
     }
 
     /**
-     * @notice Claim winnings after game resolution
+     * @notice 查询 seed 是否已生成（供前端轮询）
      * @param requestId The game request ID
      */
-    function claimWinnings(uint256 requestId) external {
-        GameResult storage game = games[requestId];
-        require(game.player == msg.sender, "Not your game");
-        require(game.state == GameState.Resolved, "Game not resolved");
-        require(game.payout > 0, "No winnings to claim");
-
-        game.state = GameState.Paid;
-        totalPayouts += game.payout;
-
-        (bool success, ) = payable(msg.sender).call{value: game.payout}("");
-        require(success, "Transfer failed");
-
-        emit GamePaid(requestId, msg.sender, game.payout);
+    function isSeedReady(uint256 requestId) external view returns (bool) {
+        return games[requestId].seed != 0;
     }
 
     /**
