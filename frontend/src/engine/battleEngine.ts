@@ -1,43 +1,38 @@
 /**
- * Battle Engine — The "Big Bang" Algorithm
+ * Battle Engine — Contract-Matching Algorithm
  *
- * Given a seed string, this module deterministically resolves an entire
- * 5-round tarot battle. The result is a complete battle log that the
- * front-end can replay with animations.
+ * This module deterministically resolves a 5-round tarot battle,
+ * producing results IDENTICAL to the FateEcho smart contract.
  *
- * Core principle: Seed → Shuffle → Deal → Resolve → Result
- * Same seed ALWAYS produces the exact same battle.
+ * Core principle: Seed → keccak256 card generation → Contract-exact resolution
+ * Same seed produces EXACTLY the same result as the on-chain contract.
+ *
+ * Contract reference: FateEcho.sol _resolveBattle / _resolveRound
  */
 
 import {
   Card,
   FULL_DECK,
-  COUNTER_MAP,
   MAX_HP,
   TOTAL_ROUNDS,
   COUNTER_BONUS,
-  Suit,
-  EffectType,
 } from "./cardData";
-import { createRNG, hashString } from "./seedEngine";
-import { DifficultyConfig, DifficultyId, DIFFICULTIES } from "./difficulty";
+import { ethers } from "ethers";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type SpecialEffect =
-  | "swap_hp"
-  | "average_hp"
-  | "dodge"
-  | "drain"
-  | "both_damage"
-  | "both_heal"
-  | "skip"
-  | "critical";
+  | "critical"
+  | "counter"
+  | "major_clash"
+  | "major_ability";
 
 export interface RoundResult {
   round: number; // 1-based
   playerCard: Card;
   enemyCard: Card;
+  playerCardId: number;
+  enemyCardId: number;
   playerDamageDealt: number; // damage player dealt TO enemy
   enemyDamageDealt: number; // damage enemy dealt TO player
   playerHeal: number;
@@ -53,8 +48,6 @@ export interface RoundResult {
 
 export interface BattleResult {
   seed: string;
-  seedHash: number;
-  difficultyId: DifficultyId;
   rounds: RoundResult[];
   playerWon: boolean;
   playerFinalHp: number;
@@ -65,445 +58,360 @@ export interface BattleResult {
   totalRoundsPlayed: number;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Contract-Matching Card Generation ───────────────────────────────────────
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
+/**
+ * Matches Solidity: _hashToCardId(seed, nonce)
+ * uint256(keccak256(abi.encodePacked(seed, nonce))) % 78
+ */
+function hashToCardId(seed: string, nonce: number): number {
+  const hash = ethers.keccak256(
+    ethers.solidityPacked(["uint256", "uint256"], [seed, nonce])
+  );
+  return Number(BigInt(hash) % 78n);
 }
 
-function doesCounter(attacker: Suit, defender: Suit): boolean {
-  return COUNTER_MAP[attacker] === defender;
+// ─── Contract-Matching Card Properties ───────────────────────────────────────
+
+/** Matches Solidity: cardId < 22 */
+function isMajorArcana(cardId: number): boolean {
+  return cardId < 22;
 }
 
-// ─── Minor vs Minor Combat ──────────────────────────────────────────────────
+/** Matches Solidity: ((cardId - 22) % 14) + 1 */
+function getMinorValue(cardId: number): number {
+  return ((cardId - 22) % 14) + 1;
+}
 
-function resolveMinorVsMinor(
-  pCard: Card,
-  eCard: Card,
-): {
-  pDmg: number;
-  eDmg: number;
-  pHeal: number;
-  eHeal: number;
-  narrative: string;
-  critical: boolean;
-} {
-  let pPower = pCard.value!;
-  let ePower = eCard.value!;
-  let narrative = "";
-  let critical = false;
+/**
+ * Matches Solidity: Suit((cardId - 22) / 14)
+ * Returns suit index: 0=Wands, 1=Cups, 2=Swords, 3=Pentacles
+ */
+function getMinorSuitIndex(cardId: number): number {
+  return Math.floor((cardId - 22) / 14);
+}
 
-  // Element counter
-  const pCounters = doesCounter(pCard.suit!, eCard.suit!);
-  const eCounters = doesCounter(eCard.suit!, pCard.suit!);
+const SUIT_NAMES = ["Wands", "Cups", "Swords", "Pentacles"] as const;
 
-  if (pCounters) {
-    pPower += COUNTER_BONUS;
-    narrative += `🔥 ${pCard.suit} counters ${eCard.suit}! (+${COUNTER_BONUS}) `;
-  } else if (eCounters) {
-    ePower += COUNTER_BONUS;
-    narrative += `🔥 ${eCard.suit} counters ${pCard.suit}! (+${COUNTER_BONUS}) `;
+/**
+ * Matches Solidity: _doesCounter(attacker, defender)
+ * Wands>Pentacles, Pentacles>Swords, Swords>Cups, Cups>Wands
+ */
+function doesCounter(attackerSuit: number, defenderSuit: number): boolean {
+  if (attackerSuit === 0 && defenderSuit === 3) return true; // Wands > Pentacles
+  if (attackerSuit === 3 && defenderSuit === 2) return true; // Pentacles > Swords
+  if (attackerSuit === 2 && defenderSuit === 1) return true; // Swords > Cups
+  if (attackerSuit === 1 && defenderSuit === 0) return true; // Cups > Wands
+  return false;
+}
+
+/** Matches Solidity: _getMajorEffect — cardId % 2 (0=damage, 1=heal) */
+function getMajorEffectType(cardId: number): number {
+  return cardId % 2;
+}
+
+/** Matches Solidity: _getMajorValue — 5 + (cardId * 3) % 16 */
+function getMajorValue(cardId: number): number {
+  return 5 + ((cardId * 3) % 16);
+}
+
+// ─── Contract-Matching Round Resolution ──────────────────────────────────────
+
+interface RoundDamage {
+  pDmg: number; // player deals to enemy
+  eDmg: number; // enemy deals to player
+  pHeal: number; // player heals self
+  eHeal: number; // enemy heals self
+}
+
+/**
+ * Matches Solidity: _resolveRound(pCardId, eCardId)
+ */
+function resolveRound(pCardId: number, eCardId: number): RoundDamage {
+  const pIsMajor = isMajorArcana(pCardId);
+  const eIsMajor = isMajorArcana(eCardId);
+
+  if (pIsMajor && eIsMajor) {
+    return resolveMajorClash(pCardId, eCardId);
+  } else if (pIsMajor) {
+    return resolveMajorVsMinor(pCardId, eCardId, true);
+  } else if (eIsMajor) {
+    return resolveMajorVsMinor(eCardId, pCardId, false);
+  } else {
+    return resolveMinorVsMinor(pCardId, eCardId);
+  }
+}
+
+/**
+ * Matches Solidity: _resolveMajorClash(pCardId, eCardId)
+ * hash = keccak256(pCardId, eCardId); pDmg = 5+hash%11; eDmg = 5+(hash>>8)%11
+ */
+function resolveMajorClash(pCardId: number, eCardId: number): RoundDamage {
+  const hash = ethers.keccak256(
+    ethers.solidityPacked(["uint256", "uint256"], [pCardId, eCardId])
+  );
+  const hashBigInt = BigInt(hash);
+  return {
+    pDmg: 5 + Number(hashBigInt % 11n),
+    eDmg: 5 + Number((hashBigInt >> 8n) % 11n),
+    pHeal: 0,
+    eHeal: 0,
+  };
+}
+
+/**
+ * Matches Solidity: _resolveMajorVsMinor(majorId, minorId, majorIsPlayer)
+ */
+function resolveMajorVsMinor(
+  majorId: number,
+  minorId: number,
+  majorIsPlayer: boolean
+): RoundDamage {
+  let pDmg = 0,
+    eDmg = 0,
+    pHeal = 0,
+    eHeal = 0;
+
+  const effectType = getMajorEffectType(majorId);
+  const value = getMajorValue(majorId);
+
+  if (effectType === 0) {
+    // Damage
+    if (majorIsPlayer) pDmg = value;
+    else eDmg = value;
+  } else {
+    // Heal
+    if (majorIsPlayer) pHeal = value;
+    else eHeal = value;
   }
 
-  const diff = Math.abs(pPower - ePower);
-  let pDmg = 0; // damage player deals TO enemy
-  let eDmg = 0; // damage enemy deals TO player
+  // Minor card retaliation (half value)
+  const minorValue = getMinorValue(minorId);
+  const retaliation = Math.floor(minorValue / 2);
+  if (majorIsPlayer) eDmg = retaliation;
+  else pDmg = retaliation;
 
-  if (pPower > ePower) {
-    pDmg = diff + 2;
+  return { pDmg, eDmg, pHeal, eHeal };
+}
+
+/**
+ * Matches Solidity: _resolveMinorVsMinor(pCardId, eCardId)
+ */
+function resolveMinorVsMinor(pCardId: number, eCardId: number): RoundDamage {
+  let pValue = getMinorValue(pCardId);
+  let eValue = getMinorValue(eCardId);
+  const pSuit = getMinorSuitIndex(pCardId);
+  const eSuit = getMinorSuitIndex(eCardId);
+
+  // Element counters
+  if (doesCounter(pSuit, eSuit)) pValue += COUNTER_BONUS;
+  if (doesCounter(eSuit, pSuit)) eValue += COUNTER_BONUS;
+
+  let pDmg: number, eDmg: number;
+
+  if (pValue > eValue) {
+    pDmg = pValue - eValue + 2;
     eDmg = 1;
-    narrative += `${pCard.name} [${pPower}] overpowers ${eCard.name} [${ePower}]!`;
-    if (diff >= 8) {
-      critical = true;
-      narrative += " 💥 CRITICAL HIT!";
-    }
-  } else if (ePower > pPower) {
-    eDmg = diff + 2;
+  } else if (eValue > pValue) {
+    eDmg = eValue - pValue + 2;
     pDmg = 1;
-    narrative += `${eCard.name} [${ePower}] overpowers ${pCard.name} [${pPower}]!`;
-    if (diff >= 8) {
-      critical = true;
-      narrative += " 💥 CRITICAL HIT!";
-    }
   } else {
     pDmg = 2;
     eDmg = 2;
-    narrative += `Clash! ${pCard.name} [${pPower}] ties with ${eCard.name} [${ePower}]!`;
   }
 
-  return { pDmg, eDmg, pHeal: 0, eHeal: 0, narrative, critical };
+  return { pDmg, eDmg, pHeal: 0, eHeal: 0 };
 }
 
-// ─── Apply a Single Major Arcana Effect ──────────────────────────────────────
+// ─── Narrative Generation (UI flavor only, does not affect outcome) ──────────
 
-interface EffectResult {
-  damageToOpponent: number;
-  damageToSelf: number;
-  healSelf: number;
-  healOpponent: number;
-  special: SpecialEffect | null;
-  narrative: string;
-}
+function generateNarrative(
+  pCardId: number,
+  eCardId: number,
+  pCard: Card,
+  eCard: Card,
+  dmg: RoundDamage
+): { narrative: string; isCritical: boolean; effects: SpecialEffect[] } {
+  const pIsMajor = isMajorArcana(pCardId);
+  const eIsMajor = isMajorArcana(eCardId);
+  const effects: SpecialEffect[] = [];
+  let narrative = "";
+  let isCritical = false;
 
-function applyMajorEffect(
-  card: Card,
-  ownerHp: number,
-  opponentHp: number,
-  ownerLabel: string,
-): EffectResult {
-  const fx = card.effect!;
-  const result: EffectResult = {
-    damageToOpponent: 0,
-    damageToSelf: 0,
-    healSelf: 0,
-    healOpponent: 0,
-    special: null,
-    narrative: "",
-  };
+  if (pIsMajor && eIsMajor) {
+    // Major Clash
+    narrative = `⚡ FATE CLASH — ${pCard.name} vs ${eCard.name}! Player deals ${dmg.pDmg}, takes ${dmg.eDmg} damage!`;
+    isCritical = true;
+    effects.push("major_clash");
+  } else if (pIsMajor) {
+    // Player Major vs Enemy Minor
+    const effectWord = getMajorEffectType(pCardId) === 0 ? "strikes" : "heals";
+    narrative = `✨ ${pCard.name} ${effectWord}! `;
+    if (dmg.pDmg > 0) narrative += `Deals ${dmg.pDmg} damage. `;
+    if (dmg.pHeal > 0) narrative += `Heals ${dmg.pHeal} HP. `;
+    if (dmg.eDmg > 0)
+      narrative += `${eCard.name} retaliates for ${dmg.eDmg}.`;
+    isCritical = true;
+    effects.push("major_ability");
+  } else if (eIsMajor) {
+    // Enemy Major vs Player Minor
+    const effectWord = getMajorEffectType(eCardId) === 0 ? "strikes" : "heals";
+    narrative = `💀 ${eCard.name} ${effectWord}! `;
+    if (dmg.eDmg > 0) narrative += `Deals ${dmg.eDmg} damage. `;
+    if (dmg.eHeal > 0) narrative += `Heals ${dmg.eHeal} HP. `;
+    if (dmg.pDmg > 0)
+      narrative += `${pCard.name} retaliates for ${dmg.pDmg}.`;
+    isCritical = true;
+    effects.push("major_ability");
+  } else {
+    // Both Minor
+    const pSuitName = SUIT_NAMES[getMinorSuitIndex(pCardId)];
+    const eSuitName = SUIT_NAMES[getMinorSuitIndex(eCardId)];
+    const pCounters = doesCounter(
+      getMinorSuitIndex(pCardId),
+      getMinorSuitIndex(eCardId)
+    );
+    const eCounters = doesCounter(
+      getMinorSuitIndex(eCardId),
+      getMinorSuitIndex(pCardId)
+    );
 
-  switch (fx.type as EffectType) {
-    case "dodge":
-      result.special = "dodge";
-      result.narrative = `${ownerLabel} plays ${card.name} — dodges all damage!`;
-      break;
-
-    case "damage":
-      result.damageToOpponent = fx.value;
-      result.narrative = `${ownerLabel} plays ${card.name} — deals ${fx.value} damage!`;
-      break;
-
-    case "heal":
-      result.healSelf = fx.value;
-      result.narrative = `${ownerLabel} plays ${card.name} — heals ${fx.value} HP!`;
-      break;
-
-    case "both_heal":
-      result.healSelf = fx.value;
-      result.healOpponent = fx.value;
-      result.special = "both_heal";
-      result.narrative = `${ownerLabel} plays ${card.name} — blessing! Both heal ${fx.value} HP!`;
-      break;
-
-    case "drain":
-      result.damageToOpponent = fx.value;
-      result.healSelf = fx.value;
-      result.special = "drain";
-      result.narrative = `${ownerLabel} plays ${card.name} — drains ${fx.value} HP!`;
-      break;
-
-    case "swap":
-      result.special = "swap_hp";
-      result.narrative = `${ownerLabel} plays ${card.name} — HP SWAPPED! (${ownerHp} ↔ ${opponentHp})`;
-      break;
-
-    case "average":
-      result.special = "average_hp";
-      result.narrative = `${ownerLabel} plays ${card.name} — HP equalized to ${Math.floor((ownerHp + opponentHp) / 2)}!`;
-      break;
-
-    case "both_damage":
-      result.damageToOpponent = fx.value;
-      result.damageToSelf = fx.value;
-      result.special = "both_damage";
-      result.narrative = `${ownerLabel} plays ${card.name} — DESTRUCTION! Both take ${fx.value} damage!`;
-      break;
-
-    case "skip":
-      result.healSelf = fx.value;
-      result.healOpponent = fx.value;
-      result.special = "skip";
-      result.narrative = `${ownerLabel} plays ${card.name} — time stands still. Both heal ${fx.value}.`;
-      break;
-
-    case "conditional": {
-      const idx = card.majorIndex!;
-      if (idx === 11) {
-        // Justice: damage = |HP difference|
-        const diff = Math.abs(ownerHp - opponentHp);
-        result.damageToOpponent = Math.max(diff, 3);
-        result.narrative = `${ownerLabel} plays ${card.name} — Balance! Deals ${result.damageToOpponent} damage (HP diff)!`;
-      } else if (idx === 20) {
-        // Judgement: if losing, deal 18; else deal 5
-        if (ownerHp < opponentHp) {
-          result.damageToOpponent = 18;
-          result.narrative = `${ownerLabel} plays ${card.name} — RECKONING! Underdog fury deals 18 damage!`;
-        } else {
-          result.damageToOpponent = 5;
-          result.narrative = `${ownerLabel} plays ${card.name} — Judgement passed. Deals 5 damage.`;
-        }
-      }
-      break;
+    if (pCounters) {
+      narrative += `🔥 ${pSuitName} counters ${eSuitName}! (+${COUNTER_BONUS}) `;
+      effects.push("counter");
+    } else if (eCounters) {
+      narrative += `🔥 ${eSuitName} counters ${pSuitName}! (+${COUNTER_BONUS}) `;
+      effects.push("counter");
     }
 
-    case "damage_heal":
-      result.damageToOpponent = fx.value;
-      result.healSelf = fx.secondaryValue ?? 0;
-      result.narrative = `${ownerLabel} plays ${card.name} — deals ${fx.value} damage & heals ${fx.secondaryValue} HP!`;
-      break;
+    if (dmg.pDmg > dmg.eDmg) {
+      narrative += `${pCard.name} overpowers ${eCard.name}!`;
+      if (dmg.pDmg >= 10) {
+        isCritical = true;
+        narrative += " 💥 CRITICAL!";
+        effects.push("critical");
+      }
+    } else if (dmg.eDmg > dmg.pDmg) {
+      narrative += `${eCard.name} overpowers ${pCard.name}!`;
+      if (dmg.eDmg >= 10) {
+        isCritical = true;
+        narrative += " 💥 CRITICAL!";
+        effects.push("critical");
+      }
+    } else {
+      narrative += `${pCard.name} clashes with ${eCard.name}! It's a tie!`;
+    }
   }
 
-  return result;
+  return { narrative, isCritical, effects };
+}
+
+// ─── Seed Normalization ──────────────────────────────────────────────────────
+
+/**
+ * Normalize any string seed to a uint256 decimal string.
+ * - If it's already a valid uint256 decimal or hex → use directly
+ * - Otherwise, hash it via keccak256 to produce a uint256
+ */
+function normalizeSeed(input: string): string {
+  // Try to parse as BigInt directly (decimal or 0x hex)
+  try {
+    const val = BigInt(input);
+    if (val >= 0n && val < 2n ** 256n) return val.toString();
+  } catch {
+    // Not a valid number
+  }
+  // Hash arbitrary string to uint256
+  const hash = ethers.keccak256(ethers.toUtf8Bytes(input));
+  return BigInt(hash).toString();
 }
 
 // ─── Main Battle Resolver ────────────────────────────────────────────────────
 
-export function resolveBattle(
-  seedString: string,
-  difficultyId: DifficultyId = "normal",
-): BattleResult {
-  const diff: DifficultyConfig = DIFFICULTIES[difficultyId];
-  const seedNum = hashString(seedString);
-  const rng = createRNG(seedNum);
+/**
+ * Resolve a battle deterministically from a VRF seed.
+ * The result is IDENTICAL to FateEcho.sol _resolveBattle(seed).
+ *
+ * @param seed The VRF seed as a decimal string (uint256)
+ * @returns Complete battle result with per-round details
+ */
+export function resolveBattle(seed: string): BattleResult {
+  // Normalize seed: arbitrary strings → uint256; VRF seeds pass through
+  const normalizedSeed = normalizeSeed(seed);
 
-  // Shuffle the 78-card deck deterministically
-  const shuffled = rng.shuffle(FULL_DECK);
+  // ── Generate cards using contract-matching keccak256 ──
+  const playerCardIds: number[] = [];
+  const enemyCardIds: number[] = [];
 
-  // Deal: alternate player/enemy for TOTAL_ROUNDS
-  const playerCards: Card[] = [];
-  const enemyCards: Card[] = [];
   for (let i = 0; i < TOTAL_ROUNDS; i++) {
-    playerCards.push(shuffled[i * 2]);
-    enemyCards.push(shuffled[i * 2 + 1]);
+    playerCardIds.push(hashToCardId(normalizedSeed, i * 2));
+    enemyCardIds.push(hashToCardId(normalizedSeed, i * 2 + 1));
   }
 
-  const playerMaxHp = diff.playerStartHp;
-  const enemyMaxHp = diff.enemyStartHp;
-  let playerHp = playerMaxHp;
-  let enemyHp = enemyMaxHp;
+  // ── Simulate battle (contract-exact) ──
+  let playerHp = MAX_HP; // 30
+  let enemyHp = MAX_HP; // 30
   const rounds: RoundResult[] = [];
 
   for (let i = 0; i < TOTAL_ROUNDS; i++) {
-    // Early termination: if either side is at 0 HP
-    if (playerHp <= 0 || enemyHp <= 0) break;
+    if (playerHp === 0 || enemyHp === 0) break;
 
-    const pCard = playerCards[i];
-    const eCard = enemyCards[i];
+    const pCardId = playerCardIds[i];
+    const eCardId = enemyCardIds[i];
+    const pCard = FULL_DECK[pCardId];
+    const eCard = FULL_DECK[eCardId];
     const hpBefore = { player: playerHp, enemy: enemyHp };
 
-    let pDmg = 0; // damage player deals to enemy
-    let eDmg = 0; // damage enemy deals to player
-    let pHeal = 0;
-    let eHeal = 0;
-    let narrative = "";
-    let isCritical = false;
-    const specialEffects: SpecialEffect[] = [];
+    // Contract-matching round resolution
+    const dmg = resolveRound(pCardId, eCardId);
 
-    const pIsMajor = pCard.type === "major";
-    const eIsMajor = eCard.type === "major";
+    // Apply damage (contract-exact: saturating subtraction)
+    enemyHp = enemyHp > dmg.pDmg ? enemyHp - dmg.pDmg : 0;
+    playerHp = playerHp > dmg.eDmg ? playerHp - dmg.eDmg : 0;
 
-    if (pIsMajor && eIsMajor) {
-      // ── Both Major: "Fate Clash" ──
-      narrative = `⚡ FATE CLASH — ${pCard.name} vs ${eCard.name}!\n`;
-      isCritical = true;
+    // Apply healing (contract-exact: cap at MAX_HP)
+    playerHp =
+      playerHp > MAX_HP - dmg.pHeal ? MAX_HP : playerHp + dmg.pHeal;
+    enemyHp =
+      enemyHp > MAX_HP - dmg.eHeal ? MAX_HP : enemyHp + dmg.eHeal;
 
-      const pEffect = applyMajorEffect(pCard, playerHp, enemyHp, "You");
-      const eEffect = applyMajorEffect(eCard, enemyHp, playerHp, "Enemy");
-
-      // Handle specials that alter HP directly first
-      if (pEffect.special === "swap_hp" || eEffect.special === "swap_hp") {
-        const temp = playerHp;
-        playerHp = enemyHp;
-        enemyHp = temp;
-        specialEffects.push("swap_hp");
-        narrative += "HP has been swapped!\n";
-      } else if (
-        pEffect.special === "average_hp" ||
-        eEffect.special === "average_hp"
-      ) {
-        const avg = Math.floor((playerHp + enemyHp) / 2);
-        playerHp = avg;
-        enemyHp = avg;
-        specialEffects.push("average_hp");
-        narrative += `HP equalized to ${avg}!\n`;
-      } else {
-        // Normal effect resolution
-        let playerDodge = pEffect.special === "dodge";
-        let enemyDodge = eEffect.special === "dodge";
-
-        pDmg = playerDodge ? 0 : eEffect.damageToOpponent;
-        eDmg = enemyDodge ? 0 : pEffect.damageToOpponent;
-
-        // Self-damage
-        pDmg += pEffect.damageToSelf;
-        eDmg += eEffect.damageToSelf;
-
-        pHeal = pEffect.healSelf + eEffect.healOpponent;
-        eHeal = eEffect.healSelf + pEffect.healOpponent;
-
-        if (playerDodge) specialEffects.push("dodge");
-        if (pEffect.special === "drain" || eEffect.special === "drain")
-          specialEffects.push("drain");
-        if (
-          pEffect.special === "both_damage" ||
-          eEffect.special === "both_damage"
-        )
-          specialEffects.push("both_damage");
-
-        narrative += pEffect.narrative + "\n" + eEffect.narrative;
-      }
-    } else if (pIsMajor) {
-      // ── Player Major vs Enemy Minor ──
-      const pEffect = applyMajorEffect(pCard, playerHp, enemyHp, "You");
-
-      if (pEffect.special === "swap_hp") {
-        const temp = playerHp;
-        playerHp = enemyHp;
-        enemyHp = temp;
-        specialEffects.push("swap_hp");
-        narrative = pEffect.narrative;
-      } else if (pEffect.special === "average_hp") {
-        const avg = Math.floor((playerHp + enemyHp) / 2);
-        playerHp = avg;
-        enemyHp = avg;
-        specialEffects.push("average_hp");
-        narrative = pEffect.narrative;
-      } else if (pEffect.special === "skip") {
-        pHeal = pEffect.healSelf;
-        eHeal = pEffect.healOpponent;
-        specialEffects.push("skip");
-        narrative = pEffect.narrative;
-      } else {
-        // Major effect fires
-        pDmg = 0;
-        eDmg = 0;
-
-        // Player deals major damage
-        eDmg = 0; // enemy takes nothing from player's "attack" — we use effect damage
-        const effectDmgToEnemy = pEffect.damageToOpponent;
-        const effectDmgToSelf = pEffect.damageToSelf;
-
-        // Enemy minor card still does reduced damage
-        const enemyAttack = Math.max(Math.ceil(eCard.value! / 2), 1);
-
-        if (pEffect.special === "dodge") {
-          pDmg = effectDmgToEnemy; // to enemy
-          eDmg = 0; // player dodges
-          specialEffects.push("dodge");
-        } else {
-          pDmg = effectDmgToEnemy;
-          eDmg = enemyAttack + effectDmgToSelf;
-        }
-
-        pHeal = pEffect.healSelf;
-        eHeal = pEffect.healOpponent;
-
-        if (pEffect.special === "drain") specialEffects.push("drain");
-        if (pEffect.special === "both_damage")
-          specialEffects.push("both_damage");
-        if (pEffect.special === "both_heal") specialEffects.push("both_heal");
-
-        narrative = `✨ ${pEffect.narrative}\n📎 Enemy retaliates with ${eCard.name} for ${enemyAttack} damage.`;
-      }
-
-      isCritical = true;
-    } else if (eIsMajor) {
-      // ── Enemy Major vs Player Minor ──
-      const eEffect = applyMajorEffect(eCard, enemyHp, playerHp, "Enemy");
-
-      if (eEffect.special === "swap_hp") {
-        const temp = playerHp;
-        playerHp = enemyHp;
-        enemyHp = temp;
-        specialEffects.push("swap_hp");
-        narrative = eEffect.narrative;
-      } else if (eEffect.special === "average_hp") {
-        const avg = Math.floor((playerHp + enemyHp) / 2);
-        playerHp = avg;
-        enemyHp = avg;
-        specialEffects.push("average_hp");
-        narrative = eEffect.narrative;
-      } else if (eEffect.special === "skip") {
-        pHeal = eEffect.healOpponent;
-        eHeal = eEffect.healSelf;
-        specialEffects.push("skip");
-        narrative = eEffect.narrative;
-      } else {
-        const effectDmgToPlayer = eEffect.damageToOpponent;
-        const effectDmgToSelf = eEffect.damageToSelf;
-
-        // Player minor card does reduced damage
-        const playerAttack = Math.max(Math.ceil(pCard.value! / 2), 1);
-
-        if (eEffect.special === "dodge") {
-          eDmg = effectDmgToPlayer; // to player
-          pDmg = 0; // enemy dodges player's attack
-          specialEffects.push("dodge");
-        } else {
-          eDmg = effectDmgToPlayer + effectDmgToSelf;
-          pDmg = playerAttack;
-        }
-
-        pHeal = eEffect.healOpponent;
-        eHeal = eEffect.healSelf;
-
-        if (eEffect.special === "drain") specialEffects.push("drain");
-        if (eEffect.special === "both_damage")
-          specialEffects.push("both_damage");
-        if (eEffect.special === "both_heal") specialEffects.push("both_heal");
-
-        narrative = `💀 ${eEffect.narrative}\n📎 You retaliate with ${pCard.name} for ${playerAttack} damage.`;
-      }
-
-      isCritical = true;
-    } else {
-      // ── Both Minor: Normal Combat ──
-      const result = resolveMinorVsMinor(pCard, eCard);
-      pDmg = result.pDmg; // player deals to enemy
-      eDmg = result.eDmg; // enemy deals to player
-      pHeal = result.pHeal;
-      eHeal = result.eHeal;
-      narrative = result.narrative;
-      isCritical = result.critical;
-      if (isCritical) specialEffects.push("critical");
-    }
-
-    // Apply damage and healing (skip for already-applied swap/average)
-    const isDirectHpChange =
-      specialEffects.includes("swap_hp") ||
-      specialEffects.includes("average_hp");
-    if (!isDirectHpChange) {
-      // Apply difficulty damage bonuses
-      const finalPlayerDmg = Math.max(0, pDmg + diff.playerDmgBonus);
-      const finalEnemyDmg = Math.max(0, eDmg + diff.enemyDmgBonus);
-      const finalEnemyHeal = eHeal + diff.enemyHealBonus;
-
-      enemyHp = clamp(enemyHp - finalPlayerDmg + finalEnemyHeal, 0, enemyMaxHp);
-      playerHp = clamp(playerHp - finalEnemyDmg + pHeal, 0, playerMaxHp);
-
-      // Update displayed damage/heal to match actual HP changes
-      pDmg = finalPlayerDmg;
-      eDmg = finalEnemyDmg;
-      eHeal = finalEnemyHeal;
-    }
+    // Generate narrative for UI (does not affect HP values)
+    const { narrative, isCritical, effects } = generateNarrative(
+      pCardId,
+      eCardId,
+      pCard,
+      eCard,
+      dmg
+    );
 
     rounds.push({
       round: i + 1,
       playerCard: pCard,
       enemyCard: eCard,
-      playerDamageDealt: pDmg,
-      enemyDamageDealt: eDmg,
-      playerHeal: pHeal,
-      enemyHeal: eHeal,
+      playerCardId: pCardId,
+      enemyCardId: eCardId,
+      playerDamageDealt: dmg.pDmg,
+      enemyDamageDealt: dmg.eDmg,
+      playerHeal: dmg.pHeal,
+      enemyHeal: dmg.eHeal,
       playerHpBefore: hpBefore.player,
       enemyHpBefore: hpBefore.enemy,
       playerHpAfter: playerHp,
       enemyHpAfter: enemyHp,
       narrative,
       isCritical,
-      specialEffects,
+      specialEffects: effects,
     });
   }
 
   return {
-    seed: seedString,
-    seedHash: seedNum,
-    difficultyId,
+    seed: normalizedSeed,
     rounds,
     playerWon: playerHp > enemyHp,
     playerFinalHp: Math.max(playerHp, 0),
     enemyFinalHp: Math.max(enemyHp, 0),
-    playerMaxHp,
-    enemyMaxHp,
+    playerMaxHp: MAX_HP,
+    enemyMaxHp: MAX_HP,
     isDraw: playerHp === enemyHp,
     totalRoundsPlayed: rounds.length,
   };

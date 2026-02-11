@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import { BattleResult } from "../engine/battleEngine";
-import { DIFFICULTIES } from "../engine/difficulty";
 import { soundManager } from "../utils/soundManager";
 
 interface GameOverProps {
@@ -23,10 +22,8 @@ export const GameOver: React.FC<GameOverProps> = ({
     enemyFinalHp,
     playerMaxHp,
     enemyMaxHp,
-    difficultyId,
     rounds,
     seed,
-    seedHash,
   } = battleResult;
 
   // Play victory/defeat sound on mount
@@ -45,11 +42,11 @@ export const GameOver: React.FC<GameOverProps> = ({
     };
   }, [playerWon, isDraw]);
 
-  const diff = DIFFICULTIES[difficultyId];
+  const diff = { color: "#ffd700", icon: "⚔", name: "On-Chain", multiplier: 1.9, drawMultiplier: 1 };
   const resultText = isDraw ? "DRAW" : playerWon ? "VICTORY" : "DEFEAT";
   const resultClass = isDraw ? "draw" : playerWon ? "victory" : "defeat";
 
-  // Calculate payout based on difficulty
+  // Calculate payout (5% house edge, matching contract)
   const multiplier = isDraw
     ? diff.drawMultiplier
     : playerWon
@@ -174,18 +171,8 @@ export const GameOver: React.FC<GameOverProps> = ({
         <div className="gameover-verification">
           <h3>🔮 Provably Fair</h3>
           <div className="verification-field">
-            <span className="verification-label">Seed</span>
+            <span className="verification-label">VRF Seed</span>
             <code className="verification-value">{seed}</code>
-          </div>
-          <div className="verification-field">
-            <span className="verification-label">Hash</span>
-            <code className="verification-value">{seedHash}</code>
-          </div>
-          <div className="verification-field">
-            <span className="verification-label">Difficulty</span>
-            <code className="verification-value" style={{ color: diff.color }}>
-              {diff.icon} {diff.name} (×{diff.multiplier})
-            </code>
           </div>
           <div className="verification-field">
             <span className="verification-label">Events</span>
@@ -194,8 +181,8 @@ export const GameOver: React.FC<GameOverProps> = ({
             </code>
           </div>
           <p className="verification-hint">
-            Enter the same seed + same difficulty to replay this exact battle —
-            every card, every outcome, identical.
+            This battle is provably fair — the same VRF seed always produces the
+            exact same result, verifiable on-chain.
           </p>
         </div>
 

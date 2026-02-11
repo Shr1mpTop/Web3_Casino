@@ -77,106 +77,30 @@ export const SUIT_LABEL: Record<Suit, string> = {
 
 // ─── Major Arcana Effects ────────────────────────────────────────────────────
 
+// Major effects match contract: cardId%2 → 0=damage, 1=heal; value = 5+(cardId*3)%16
 const MAJOR_EFFECTS: MajorEffect[] = [
-  /* 00 */ {
-    type: "dodge",
-    value: 0,
-    description: "Dodge — Take no damage this round",
-  },
-  /* 01 */ {
-    type: "damage",
-    value: 16,
-    description: "Arcane Burst — Deal 16 damage",
-  },
-  /* 02 */ {
-    type: "damage",
-    value: 11,
-    description: "Foresight — Deal 11 piercing damage",
-  },
-  /* 03 */ { type: "heal", value: 8, description: "Nurture — Heal 8 HP" },
-  /* 04 */ {
-    type: "damage",
-    value: 10,
-    description: "Authority — Deal 10 fixed damage",
-  },
-  /* 05 */ {
-    type: "both_heal",
-    value: 5,
-    description: "Blessing — Both players heal 5 HP",
-  },
-  /* 06 */ { type: "heal", value: 6, description: "Bond — Heal 6 HP" },
-  /* 07 */ {
-    type: "damage",
-    value: 9,
-    description: "Charge — Ram for 9 damage",
-  },
-  /* 08 */ {
-    type: "damage",
-    value: 14,
-    description: "Might — Strike with power 14",
-  },
-  /* 09 */ {
-    type: "dodge",
-    value: 0,
-    description: "Evasion — Fade into shadow, dodge all",
-  },
-  /* 10 */ {
-    type: "swap",
-    value: 0,
-    description: "Fate Spin — Swap HP with opponent",
-  },
-  /* 11 */ {
-    type: "conditional",
-    value: 0,
-    description: "Balance — Damage = |HP difference|",
-  },
-  /* 12 */ {
-    type: "skip",
-    value: 3,
-    description: "Suspension — Skip round, both heal 3",
-  },
-  /* 13 */ {
-    type: "damage",
-    value: 15,
-    description: "Reaper — Deal 15 true damage",
-  },
-  /* 14 */ {
-    type: "average",
-    value: 0,
-    description: "Equilibrium — Set both HP to average",
-  },
-  /* 15 */ {
-    type: "drain",
-    value: 5,
-    description: "Dark Pact — Steal 5 HP from opponent",
-  },
-  /* 16 */ {
-    type: "both_damage",
-    value: 10,
-    description: "Destruction — Both take 10 damage",
-  },
-  /* 17 */ { type: "heal", value: 12, description: "Miracle — Heal 12 HP" },
-  /* 18 */ {
-    type: "damage",
-    value: 7,
-    description: "Illusion — Confuse for 7 damage",
-  },
-  /* 19 */ {
-    type: "damage_heal",
-    value: 12,
-    secondaryValue: 5,
-    description: "Radiance — Deal 12 damage & heal 5",
-  },
-  /* 20 */ {
-    type: "conditional",
-    value: 0,
-    description: "Reckoning — If losing: 18 dmg; else 5",
-  },
-  /* 21 */ {
-    type: "damage",
-    value: 20,
-    description: "Absolute — Deal 20 damage",
-  },
+  /* 00 */ { type: "damage", value: 5, description: "The Fool opens the void — Deal 5 damage" },
+  /* 01 */ { type: "heal", value: 8, description: "Arcane restoration — Heal 8 HP" },
+  /* 02 */ { type: "damage", value: 11, description: "Foresight pierces — Deal 11 damage" },
+  /* 03 */ { type: "heal", value: 14, description: "Nature's embrace — Heal 14 HP" },
+  /* 04 */ { type: "damage", value: 17, description: "Imperial decree — Deal 17 damage" },
+  /* 05 */ { type: "heal", value: 20, description: "Divine blessing — Heal 20 HP" },
+  /* 06 */ { type: "damage", value: 7, description: "Love's arrow — Deal 7 damage" },
+  /* 07 */ { type: "heal", value: 10, description: "Victorious charge — Heal 10 HP" },
+  /* 08 */ { type: "damage", value: 13, description: "Mighty strike — Deal 13 damage" },
+  /* 09 */ { type: "heal", value: 16, description: "Hermit's wisdom — Heal 16 HP" },
+  /* 10 */ { type: "damage", value: 19, description: "Fate's reckoning — Deal 19 damage" },
+  /* 11 */ { type: "heal", value: 6, description: "Balanced scales — Heal 6 HP" },
+  /* 12 */ { type: "damage", value: 9, description: "Suspended sacrifice — Deal 9 damage" },
+  /* 13 */ { type: "heal", value: 12, description: "Death's renewal — Heal 12 HP" },
+  /* 14 */ { type: "damage", value: 15, description: "Tempered blade — Deal 15 damage" },
+  /* 15 */ { type: "heal", value: 18, description: "Dark pact heals — Heal 18 HP" },
+  /* 16 */ { type: "damage", value: 5, description: "Tower crashes — Deal 5 damage" },
+  /* 17 */ { type: "heal", value: 8, description: "Star's light — Heal 8 HP" },
+  /* 18 */ { type: "damage", value: 11, description: "Lunar illusion — Deal 11 damage" },
+  /* 19 */ { type: "heal", value: 14, description: "Solar radiance — Heal 14 HP" },
+  /* 20 */ { type: "damage", value: 17, description: "Final judgement — Deal 17 damage" },
+  /* 21 */ { type: "heal", value: 20, description: "World's harmony — Heal 20 HP" },
 ];
 
 // ─── Major Arcana Card Names / Filenames ─────────────────────────────────────
@@ -243,7 +167,8 @@ function buildDeck(): Card[] {
   }
 
   // Minor Arcana (id 22-77)
-  const suits: Suit[] = ["Cups", "Pentacles", "Swords", "Wands"];
+  // Order matches contract enum: Wands=0, Cups=1, Swords=2, Pentacles=3
+  const suits: Suit[] = ["Wands", "Cups", "Swords", "Pentacles"];
   let id = 22;
   for (const suit of suits) {
     for (let value = 1; value <= 14; value++) {

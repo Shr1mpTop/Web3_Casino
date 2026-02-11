@@ -6,7 +6,6 @@ import { CardGallery } from "./components/CardGallery";
 import { HowToPlay } from "./components/HowToPlay";
 import { SpaceBackground } from "./components/SpaceBackground";
 import { resolveBattle, BattleResult } from "./engine/battleEngine";
-import type { DifficultyId } from "./engine/difficulty";
 
 type GamePhase = "setup" | "battle" | "gameover" | "gallery" | "howtoplay";
 
@@ -16,16 +15,16 @@ function App() {
   const [betAmount, setBetAmount] = useState(100);
 
   const handleStartGame = useCallback(
-    (seed: string, bet: number, difficulty: DifficultyId) => {
-      // The "Big Bang": seed + difficulty determines EVERYTHING
-      const result = resolveBattle(seed, difficulty);
+    (seed: string, bet: number, _difficulty?: string) => {
+      // Seed determines EVERYTHING — contract-matching algorithm
+      const result = resolveBattle(seed);
       setBattleResult(result);
       setBetAmount(bet);
       setPhase("battle");
 
       // Debug: log the entire battle to console for verification
       console.group(
-        `🔮 Battle Resolved — Seed: "${seed}" | Difficulty: ${difficulty}`,
+        `🔮 Battle Resolved — Seed: "${seed}"`,
       );
       console.log(
         "Result:",
