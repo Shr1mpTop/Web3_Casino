@@ -65,17 +65,11 @@ contract FateEcho is VRFConsumerBaseV2Plus {
     mapping(address => uint256[]) public playerGames;
 
     // Treasury
-    address public immutable owner;
     uint256 public totalVolume;
     uint256 public totalPayouts;
     uint256 public totalGames;
 
     // Modifiers
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner");
-        _;
-    }
-
     modifier validBet(uint256 amount) {
         require(amount >= 0.001 ether && amount <= 1 ether, "Bet must be between 0.001 and 1 ETH");
         _;
@@ -97,7 +91,6 @@ contract FateEcho is VRFConsumerBaseV2Plus {
         i_subscriptionId = subscriptionId;
         i_keyHash = keyHash;
         i_callbackGasLimit = callbackGasLimit;
-        owner = msg.sender;
     }
 
     /**
@@ -214,7 +207,7 @@ contract FateEcho is VRFConsumerBaseV2Plus {
         uint256 balance = address(this).balance;
         require(balance > 0, "No funds to withdraw");
 
-        (bool success, ) = payable(owner).call{value: balance}("");
+        (bool success, ) = payable(owner()).call{value: balance}("");
         require(success, "Transfer failed");
     }
 
