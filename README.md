@@ -13,7 +13,7 @@
 
   **A fully on-chain tarot card battle game with Chainlink VRF randomness, ETH wagering, and mathematically proven house edge.**
 
-  [Live Demo](#-quick-start) · [Contract on Etherscan](https://sepolia.etherscan.io/address/0x441846effc4836570e80dbbb43ff041a8ea14910) · [House Edge Analysis](doc/HOUSE_EDGE_ANALYSIS.md)
+  [🎮 Live Demo](https://fate-s-echo.onrender.com/) · [Contract on Etherscan](https://sepolia.etherscan.io/address/0x441846effc4836570e80dbbb43ff041a8ea14910) · [House Edge Analysis](doc/game_design/HOUSE_EDGE_ANALYSIS.md)
 
 </div>
 
@@ -173,7 +173,9 @@ Web3_Casino/
 │   └── package.json
 │
 ├── doc/                                # Documentation
-│   ├── HOUSE_EDGE_ANALYSIS.md          # Scientific house edge report
+│   ├── game_design/
+│   │   └── HOUSE_EDGE_ANALYSIS.md      # Scientific house edge report
+│   ├── DEPLOYMENT.md                   # Render deployment guide
 │   ├── REMIX_DEPLOY_GUIDE.md           # Contract deployment guide
 │   ├── PROJECT_EXPLANATION.md          # Technical deep-dive
 │   └── PROJECT_REQUIREMENTS.md         # SC6107 requirements
@@ -333,7 +335,7 @@ The negative Kelly criterion (−9.77%) confirms the house holds a mathematical 
 | American Roulette | 5.26% |
 | Slot Machines | 2–15% |
 
-Full analysis with variance, ruin probability, and profit trajectory: [`doc/HOUSE_EDGE_ANALYSIS.md`](doc/HOUSE_EDGE_ANALYSIS.md)
+Full analysis with variance, ruin probability, and profit trajectory: [`doc/game_design/HOUSE_EDGE_ANALYSIS.md`](doc/game_design/HOUSE_EDGE_ANALYSIS.md)
 
 ### Run the Simulation
 
@@ -376,7 +378,7 @@ npx tsx monte_carlo.ts 1000000  # Run house edge simulation
 
 | Document | Description |
 |----------|-------------|
-| [`doc/HOUSE_EDGE_ANALYSIS.md`](doc/HOUSE_EDGE_ANALYSIS.md) | Monte Carlo simulation results, payout optimization, risk analysis |
+| [`doc/game_design/HOUSE_EDGE_ANALYSIS.md`](doc/game_design/HOUSE_EDGE_ANALYSIS.md) | Monte Carlo simulation results, payout optimization, risk analysis |
 | [`doc/REMIX_DEPLOY_GUIDE.md`](doc/REMIX_DEPLOY_GUIDE.md) | Step-by-step contract deployment on Remix |
 | [`doc/PROJECT_EXPLANATION.md`](doc/PROJECT_EXPLANATION.md) | Technical architecture deep-dive |
 | [`doc/PROJECT_REQUIREMENTS.md`](doc/PROJECT_REQUIREMENTS.md) | SC6107 Option 4 requirements mapping |

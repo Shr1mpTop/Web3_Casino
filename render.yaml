@@ -21,6 +21,8 @@ services:
         sync: false
       - key: VITE_FATE_ECHO_CONTRACT_ADDRESS
         sync: false
+      - key: VITE_WALLETCONNECT_PROJECT_ID
+        sync: false
       - key: VITE_VRF_COORDINATOR
         sync: false
       - key: VITE_VRF_KEY_HASH

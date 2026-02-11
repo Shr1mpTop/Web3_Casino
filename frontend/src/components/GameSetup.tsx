@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { injected } from "wagmi/connectors";
+import { injected, walletConnect } from "wagmi/connectors";
 import { soundManager } from "../utils/soundManager";
 
 interface GameSetupProps {
@@ -40,6 +40,16 @@ export const GameSetup: React.FC<GameSetupProps> = ({
 
   const handleConnect = () => {
     connect({ connector: injected() });
+  };
+
+  const handleWalletConnect = () => {
+    const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "d7c9bd88d1b3419e9f0c5e8c6f8c1a4b";
+    connect({ 
+      connector: walletConnect({ 
+        projectId,
+        showQrModal: true 
+      }) 
+    });
   };
 
   const handleStart = () => {
@@ -85,9 +95,14 @@ export const GameSetup: React.FC<GameSetupProps> = ({
             Wallet
           </label>
           {!isConnected ? (
-            <button className="btn-primary" onClick={handleConnect}>
-              🦊 Connect MetaMask
-            </button>
+            <div className="wallet-connect-buttons">
+              <button className="btn-primary" onClick={handleConnect}>
+                🦊 MetaMask
+              </button>
+              <button className="btn-primary btn-walletconnect" onClick={handleWalletConnect}>
+                🔗 WalletConnect
+              </button>
+            </div>
           ) : (
             <div className="wallet-info">
               <div className="wallet-address">

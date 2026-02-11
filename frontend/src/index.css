@@ -378,6 +378,28 @@ body {
   transform: translateY(0);
 }
 
+/* Wallet connect buttons layout */
+.wallet-connect-buttons {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.wallet-connect-buttons .btn-primary {
+  flex: 1;
+  font-size: clamp(0.95rem, 2.2vw, 1.35rem);
+  padding: clamp(0.7rem, 1.8vw, 1rem);
+}
+
+.btn-walletconnect {
+  background: linear-gradient(135deg, #3b99fc, #2c7cd1);
+  box-shadow: 0 4px 20px rgba(59, 153, 252, 0.3);
+}
+
+.btn-walletconnect:hover {
+  box-shadow: 0 6px 30px rgba(59, 153, 252, 0.5);
+}
+
 .btn-secondary {
   padding: clamp(0.6rem, 1.4vw, 0.85rem) clamp(0.8rem, 1.8vw, 1.2rem);
   background: var(--bg-surface);

@@ -5,6 +5,7 @@
 ### 方法 1：自动部署（推荐） — Blueprint
 
 1. **推送代码到 GitHub**
+
    ```bash
    git add .
    git commit -m "Add Render deployment config"
@@ -27,6 +28,7 @@
    VITE_RPC_URL=https://rpc.sepolia.org
    VITE_BLOCK_EXPLORER=https://sepolia.etherscan.io
    VITE_FATE_ECHO_CONTRACT_ADDRESS=0x441846effc4836570e80dbbb43ff041a8ea14910
+   VITE_WALLETCONNECT_PROJECT_ID=d7c9bd88d1b3419e9f0c5e8c6f8c1a4b
    VITE_VRF_COORDINATOR=0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B
    VITE_VRF_KEY_HASH=0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae
    VITE_VRF_SUBSCRIPTION_ID=92203804540253177398615463812268143329720836751227537635235006783480287060039
@@ -51,19 +53,18 @@
 
 2. **填写配置**
 
-   | 配置项 | 值 |
-   |-------|-----|
-   | **Name** | `fates-echo` |
-   | **Region** | Singapore / Oregon / Frankfurt |
-   | **Branch** | `main` |
-   | **Root Directory** | `frontend` |
-   | **Environment** | Node |
-   | **Build Command** | `npm install && npm run build` |
-   | **Start Command** | `npx serve -s dist -l $PORT` |
-   | **Plan** | Free (或 Starter $7/月) |
+   | 配置项             | 值                             |
+   | ------------------ | ------------------------------ |
+   | **Name**           | `fates-echo`                   |
+   | **Region**         | Singapore / Oregon / Frankfurt |
+   | **Branch**         | `main`                         |
+   | **Root Directory** | `frontend`                     |
+   | **Environment**    | Node                           |
+   | **Build Command**  | `npm install && npm run build` |
+   | **Start Command**  | `npx serve -s dist -l $PORT`   |
+   | **Plan**           | Free (或 Starter $7/月)        |
 
 3. **添加环境变量**（同上 👆 方法 1 第 3 步）
-
 4. **手动触发部署**
    - 点击 **Create Web Service**
    - 等待构建和部署完成
@@ -74,7 +75,7 @@
 
 ### 构建前检查
 
-- [ ] 所有 TypeScript 编译错误已修复（`npm run build` 本地测试通过）
+- [x] 所有 TypeScript 编译错误已修复（`npm run build` 本地测试通过）
 - [ ] `.env` 文件中的合约地址正确 → `0x441846effc4836570e80dbbb43ff041a8ea14910`
 - [ ] 图片资源路径正确（`resources/Tarot Playing Cards/PNG/`）
 - [ ] Git 仓库已推送到 GitHub
@@ -106,6 +107,7 @@
 **原因**：静态资源路径错误或构建失败。
 
 **解决方案**：
+
 - 检查 Render 日志中的构建错误
 - 确认 `vite.config.ts` 中 `base` 路径正确（默认为 `/`）
 - 检查 `dist/` 目录是否生成
@@ -115,6 +117,7 @@
 **原因**：Vite 环境变量必须以 `VITE_` 开头，且在构建时注入。
 
 **解决方案**：
+
 - 确保所有环境变量都以 `VITE_` 开头
 - 在 Render Dashboard 修改环境变量后，**手动触发重新部署**（Settings → Manual Deploy → Deploy latest commit）
 
@@ -123,6 +126,7 @@
 **原因**：Vite 构建时未正确处理 `resources/` 目录。
 
 **解决方案**：
+
 ```bash
 # 在 frontend/ 目录创建 public/ 目录，复制资源
 mkdir -p public/cards
@@ -136,6 +140,7 @@ cp -r ../resources/"Tarot Playing Cards"/PNG/* public/cards/
 **原因**：Free 计划构建时间限制为 15 分钟，Node 依赖安装慢。
 
 **解决方案**：
+
 - 升级到 Starter 计划（$7/月）
 - 或优化 `package.json`，移除不必要的依赖
 
@@ -144,6 +149,7 @@ cp -r ../resources/"Tarot Playing Cards"/PNG/* public/cards/
 **原因**：RPC URL 不可用或合约地址错误。
 
 **解决方案**：
+
 - 使用备用 Sepolia RPC：
   - `https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY`
   - `https://sepolia.infura.io/v3/YOUR_INFURA_KEY`
@@ -160,11 +166,13 @@ Render 支持 GitHub 集成自动部署：
    - Settings → Build & Deploy → Auto-Deploy: **Yes**
 
 2. **每次推送代码到 `main` 分支**
+
    ```bash
    git add .
    git commit -m "Update frontend logic"
    git push origin main
    ```
+
    Render 会自动触发构建和部署
 
 3. **部署通知**
@@ -174,13 +182,14 @@ Render 支持 GitHub 集成自动部署：
 
 ## 💰 成本
 
-| 计划 | 价格 | 适用场景 |
-|-----|------|---------|
-| **Free** | $0/月 | 测试/演示项目，服务闲置 15 分钟后休眠 |
-| **Starter** | $7/月 | 生产环境，无休眠，更高构建和运行时性能 |
-| **Standard** | $25/月 | 高流量应用 |
+| 计划         | 价格   | 适用场景                               |
+| ------------ | ------ | -------------------------------------- |
+| **Free**     | $0/月  | 测试/演示项目，服务闲置 15 分钟后休眠  |
+| **Starter**  | $7/月  | 生产环境，无休眠，更高构建和运行时性能 |
+| **Standard** | $25/月 | 高流量应用                             |
 
 **Free 计划限制**：
+
 - 750 小时/月免费运行时间（≈ 31 天）
 - 闲置 15 分钟后服务休眠（下次访问需 30 秒冷启动）
 - 100 GB 出站流量/月
