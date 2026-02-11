@@ -1,33 +1,47 @@
 import React, { useState, useEffect } from "react";
-import {
-  DifficultyId,
-  DIFFICULTIES,
-  DIFFICULTY_ORDER,
-  estimateWinRate,
-} from "../engine/difficulty";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { injected } from "wagmi/connectors";
 import { soundManager } from "../utils/soundManager";
+import type { GameFlowState } from "../web3/useFateEcho";
 
 interface GameSetupProps {
-  onStartGame: (
-    seed: string,
-    betAmount: number,
-    difficulty: DifficultyId,
-  ) => void;
+  onStartGame: (betEth: string) => void;
   onOpenGallery: () => void;
   onOpenHowToPlay: () => void;
+  flowState: GameFlowState;
+  balance: string;
+  errorMessage: string | null;
+  requestId: bigint | null;
+  txHash: string | null;
+  onReset: () => void;
 }
+
+const MIN_BET = import.meta.env.VITE_MIN_BET || "0.001";
+const MAX_BET = import.meta.env.VITE_MAX_BET || "1";
+const HOUSE_EDGE = Number(import.meta.env.VITE_HOUSE_EDGE || "5");
+const WIN_MULTIPLIER = Number(import.meta.env.VITE_WIN_MULTIPLIER || "1.9");
+
+// Preset bet amounts in ETH
+const BET_PRESETS = ["0.001", "0.005", "0.01", "0.05", "0.1"];
 
 export const GameSetup: React.FC<GameSetupProps> = ({
   onStartGame,
   onOpenGallery,
   onOpenHowToPlay,
+  flowState,
+  balance,
+  errorMessage,
+  requestId,
+  txHash,
+  onReset,
 }) => {
-  const [seed, setSeed] = useState("");
-  const [betAmount, setBetAmount] = useState(100);
-  const [difficulty, setDifficulty] = useState<DifficultyId>("normal");
+  const { isConnected, address } = useAccount();
+  const { connect } = useConnect();
+  const { disconnect } = useDisconnect();
+
+  const [betAmount, setBetAmount] = useState("0.01");
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Play menu music on mount
   useEffect(() => {
     soundManager.playMenuMusic();
     return () => {
@@ -35,28 +49,27 @@ export const GameSetup: React.FC<GameSetupProps> = ({
     };
   }, []);
 
-  const diff = DIFFICULTIES[difficulty];
-  const winRate = estimateWinRate(difficulty);
-
-  const generateRandomSeed = () => {
-    const chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
-    for (let i = 0; i < 16; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setSeed(result);
+  const handleConnect = () => {
+    connect({ connector: injected() });
   };
 
   const handleStart = () => {
-    const finalSeed = seed.trim() || `random_${Date.now()}`;
-    onStartGame(finalSeed, betAmount, difficulty);
+    const bet = betAmount.trim() || MIN_BET;
+    onStartGame(bet);
   };
 
-  // Payout calculations
-  const potentialWin = Math.floor(betAmount * diff.multiplier);
-  const potentialProfit = potentialWin - betAmount;
-  const drawReturn = Math.floor(betAmount * diff.drawMultiplier);
+  const isBusy =
+    flowState === "sending_tx" ||
+    flowState === "waiting_vrf" ||
+    flowState === "settling";
+
+  const potentialWin = (parseFloat(betAmount) * WIN_MULTIPLIER).toFixed(4);
+  const potentialProfit = (
+    parseFloat(betAmount) * WIN_MULTIPLIER -
+    parseFloat(betAmount)
+  ).toFixed(4);
+
+  const explorerBase = import.meta.env.VITE_BLOCK_EXPLORER || "https://sepolia.etherscan.io";
 
   return (
     <div className="setup-container">
@@ -79,195 +92,215 @@ export const GameSetup: React.FC<GameSetupProps> = ({
         <div className="setup-logo">
           <div className="logo-symbol">☽</div>
           <h1 className="setup-title">Fate's Echo</h1>
-          <p className="setup-subtitle">Tarot Battle — Provably Fair</p>
+          <p className="setup-subtitle">On-Chain Tarot Battle — Provably Fair</p>
         </div>
 
         <div className="setup-divider" />
 
-        {/* ── Risk / Difficulty Selector ─────────────────────────── */}
+        {/* ── Wallet Connection ─────────────────────────── */}
         <div className="setup-field">
           <label className="setup-label">
-            <span className="label-icon">⚡</span>
-            Risk Level
+            <span className="label-icon">🔗</span>
+            Wallet
           </label>
-
-          <div className="difficulty-selector">
-            {DIFFICULTY_ORDER.map((id) => {
-              const d = DIFFICULTIES[id];
-              const active = difficulty === id;
-              return (
-                <button
-                  key={id}
-                  className={`difficulty-btn ${active ? "active" : ""}`}
-                  onClick={() => setDifficulty(id)}
-                  style={{
-                    borderColor: active ? d.borderColor : undefined,
-                    boxShadow: active ? `0 0 16px ${d.glowColor}` : undefined,
-                  }}
-                >
-                  <span className="diff-icon">{d.icon}</span>
-                  <span className="diff-name">{d.name}</span>
-                  <span className="diff-mult" style={{ color: d.color }}>
-                    ×{d.multiplier}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Difficulty detail panel */}
-          <div
-            className="difficulty-detail"
-            style={{ borderColor: diff.borderColor }}
-          >
-            <div className="diff-detail-header">
-              <span className="diff-detail-icon">{diff.icon}</span>
-              <span className="diff-detail-name" style={{ color: diff.color }}>
-                {diff.name}
-              </span>
-              <span className="diff-detail-mult">
-                ×{diff.multiplier} payout
-              </span>
-            </div>
-            <p className="diff-detail-desc">{diff.description}</p>
-
-            <div className="diff-stats-grid">
-              <div className="diff-stat">
-                <span className="diff-stat-label">Your HP</span>
-                <span className="diff-stat-value">{diff.playerStartHp}</span>
-              </div>
-              <div className="diff-stat">
-                <span className="diff-stat-label">Enemy HP</span>
-                <span className="diff-stat-value">{diff.enemyStartHp}</span>
-              </div>
-              <div className="diff-stat">
-                <span className="diff-stat-label">Enemy Dmg+</span>
-                <span className="diff-stat-value">+{diff.enemyDmgBonus}</span>
-              </div>
-              <div className="diff-stat">
-                <span className="diff-stat-label">Win Rate</span>
-                <span className="diff-stat-value">
-                  ~{Math.round(winRate * 100)}%
-                </span>
-              </div>
-            </div>
-
-            {/* Risk meter bar */}
-            <div className="risk-meter">
-              <div className="risk-meter-label">Risk</div>
-              <div className="risk-meter-track">
-                <div
-                  className="risk-meter-fill"
-                  style={{
-                    width: `${((DIFFICULTY_ORDER.indexOf(difficulty) + 1) / DIFFICULTY_ORDER.length) * 100}%`,
-                    background: `linear-gradient(90deg, #6ec6ff, ${diff.color})`,
-                  }}
-                />
-              </div>
-              <div className="risk-meter-label">Reward</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Seed Input ─────────────────────────── */}
-        <div className="setup-field">
-          <label className="setup-label">
-            <span className="label-icon">🔮</span>
-            Destiny Seed
-          </label>
-          <div className="seed-input-row">
-            <input
-              type="text"
-              className="setup-input"
-              value={seed}
-              onChange={(e) => setSeed(e.target.value)}
-              placeholder="Enter a seed or generate one..."
-            />
-            <button className="btn-secondary" onClick={generateRandomSeed}>
-              🎲 Random
+          {!isConnected ? (
+            <button className="btn-primary" onClick={handleConnect}>
+              🦊 Connect MetaMask
             </button>
-          </div>
-          <p className="setup-hint">
-            Same seed + same difficulty = same destiny.
-          </p>
-        </div>
-
-        {/* ── Bet Amount ─────────────────────────── */}
-        <div className="setup-field">
-          <label className="setup-label">
-            <span className="label-icon">💰</span>
-            Bet Amount
-          </label>
-          <div className="bet-presets">
-            {[50, 100, 250, 500, 1000].map((amount) => (
+          ) : (
+            <div className="wallet-info">
+              <div className="wallet-address">
+                <span className="wallet-dot" />
+                {address?.slice(0, 6)}...{address?.slice(-4)}
+              </div>
+              <div className="wallet-balance">
+                ⟠ {parseFloat(balance).toFixed(4)} ETH
+              </div>
               <button
-                key={amount}
-                className={`btn-preset ${betAmount === amount ? "active" : ""}`}
-                onClick={() => setBetAmount(amount)}
+                className="btn-small btn-disconnect"
+                onClick={() => disconnect()}
               >
-                {amount}
+                Disconnect
               </button>
-            ))}
-          </div>
-          <input
-            type="range"
-            min="10"
-            max="2000"
-            step="10"
-            value={betAmount}
-            onChange={(e) => setBetAmount(Number(e.target.value))}
-            className="bet-slider"
-          />
-          <div className="bet-display">{betAmount} tokens</div>
-
-          {/* Payout summary */}
-          <div className="payout-preview">
-            <div className="payout-preview-row win">
-              <span>Win</span>
-              <span style={{ color: diff.color }}>
-                +{potentialProfit} tokens (×{diff.multiplier})
-              </span>
             </div>
-            <div className="payout-preview-row draw">
-              <span>Draw</span>
-              <span>
-                {drawReturn === betAmount
-                  ? "Refund"
-                  : `+${drawReturn - betAmount} tokens`}
-              </span>
-            </div>
-            <div className="payout-preview-row lose">
-              <span>Lose</span>
-              <span>-{betAmount} tokens</span>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Sound Toggle */}
-        <div className="setup-field sound-toggle-field">
-          <label className="sound-toggle-label">
-            <input
-              type="checkbox"
-              checked={soundEnabled}
-              onChange={(e) => {
-                const enabled = e.target.checked;
-                setSoundEnabled(enabled);
-                soundManager.setEnabled(enabled);
-                if (enabled) {
-                  soundManager.playCardFlip();
-                  soundManager.playMenuMusic();
-                }
-              }}
-              className="sound-checkbox"
-            />
-            <span className="sound-icon">{soundEnabled ? "🔊" : "🔇"}</span>
-            <span>Sound Effects & Music</span>
-          </label>
-        </div>
+        {isConnected && (
+          <>
+            {/* ── Bet Amount (ETH) ─────────────────────────── */}
+            <div className="setup-field">
+              <label className="setup-label">
+                <span className="label-icon">⟠</span>
+                Bet Amount (ETH)
+              </label>
+              <div className="bet-presets">
+                {BET_PRESETS.map((amount) => (
+                  <button
+                    key={amount}
+                    className={`btn-preset ${betAmount === amount ? "active" : ""}`}
+                    onClick={() => setBetAmount(amount)}
+                    disabled={isBusy}
+                  >
+                    {amount}
+                  </button>
+                ))}
+              </div>
+              <div className="bet-input-row">
+                <input
+                  type="number"
+                  className="setup-input"
+                  value={betAmount}
+                  onChange={(e) => setBetAmount(e.target.value)}
+                  min={MIN_BET}
+                  max={MAX_BET}
+                  step="0.001"
+                  disabled={isBusy}
+                  placeholder={`${MIN_BET} - ${MAX_BET} ETH`}
+                />
+                <span className="input-suffix">ETH</span>
+              </div>
 
-        <button className="btn-primary start-btn" onClick={handleStart}>
-          {diff.icon} Begin the Duel — ×{diff.multiplier}
-        </button>
+              {/* Payout summary */}
+              <div className="payout-preview">
+                <div className="payout-preview-row win">
+                  <span>Win ({HOUSE_EDGE}% house edge)</span>
+                  <span style={{ color: "#ffd700" }}>
+                    +{potentialProfit} ETH (×{WIN_MULTIPLIER})
+                  </span>
+                </div>
+                <div className="payout-preview-row lose">
+                  <span>Lose</span>
+                  <span>-{betAmount} ETH</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Game Flow Status ─────────────────────────── */}
+            {flowState !== "idle" && (
+              <div className="setup-field flow-status">
+                <label className="setup-label">
+                  <span className="label-icon">📡</span>
+                  TX Status
+                </label>
+                <div className="flow-steps">
+                  <FlowStep
+                    label="Send Bet TX"
+                    state={
+                      flowState === "sending_tx"
+                        ? "active"
+                        : flowState === "idle"
+                          ? "pending"
+                          : "done"
+                    }
+                  />
+                  <FlowStep
+                    label="Waiting for VRF"
+                    state={
+                      flowState === "waiting_vrf"
+                        ? "active"
+                        : ["idle", "sending_tx"].includes(flowState)
+                          ? "pending"
+                          : "done"
+                    }
+                  />
+                  <FlowStep
+                    label="Battle Animation"
+                    state={
+                      flowState === "battle_ready" || flowState === "animating"
+                        ? "active"
+                        : [
+                              "idle",
+                              "sending_tx",
+                              "waiting_vrf",
+                            ].includes(flowState)
+                          ? "pending"
+                          : "done"
+                    }
+                  />
+                  <FlowStep
+                    label="Settle On-Chain"
+                    state={
+                      flowState === "settling"
+                        ? "active"
+                        : flowState === "settled"
+                          ? "done"
+                          : "pending"
+                    }
+                  />
+                </div>
+
+                {txHash && (
+                  <a
+                    className="tx-link"
+                    href={`${explorerBase}/tx/${txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View TX on Etherscan ↗
+                  </a>
+                )}
+
+                {requestId && (
+                  <div className="request-id">
+                    Request ID: {requestId.toString().slice(0, 20)}...
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Error Display ─────────────────────────── */}
+            {flowState === "error" && errorMessage && (
+              <div className="setup-field error-field">
+                <div className="error-message">❌ {errorMessage}</div>
+                <button className="btn-secondary" onClick={onReset}>
+                  🔄 Reset
+                </button>
+              </div>
+            )}
+
+            {/* Sound Toggle */}
+            <div className="setup-field sound-toggle-field">
+              <label className="sound-toggle-label">
+                <input
+                  type="checkbox"
+                  checked={soundEnabled}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setSoundEnabled(enabled);
+                    soundManager.setEnabled(enabled);
+                    if (enabled) {
+                      soundManager.playCardFlip();
+                      soundManager.playMenuMusic();
+                    }
+                  }}
+                  className="sound-checkbox"
+                />
+                <span className="sound-icon">
+                  {soundEnabled ? "🔊" : "🔇"}
+                </span>
+                <span>Sound Effects & Music</span>
+              </label>
+            </div>
+
+            {/* Start Button */}
+            <button
+              className="btn-primary start-btn"
+              onClick={handleStart}
+              disabled={isBusy || parseFloat(betAmount) < parseFloat(MIN_BET)}
+            >
+              {isBusy ? (
+                <>
+                  {flowState === "sending_tx" && "⏳ Sending TX..."}
+                  {flowState === "waiting_vrf" && "🔮 Waiting for VRF..."}
+                  {flowState === "settling" && "⏳ Settling..."}
+                </>
+              ) : (
+                <>⚔ Place Bet — {betAmount} ETH</>
+              )}
+            </button>
+          </>
+        )}
 
         <div className="setup-nav-buttons">
           <button className="btn-secondary" onClick={onOpenGallery}>
@@ -281,10 +314,28 @@ export const GameSetup: React.FC<GameSetupProps> = ({
         <div className="setup-footer">
           <p>5 rounds of fate. 78 tarot cards. One destiny.</p>
           <p className="footer-small">
-            Powered by deterministic PRNG — every result is verifiable
+            Chainlink VRF powered — every result is verifiable on-chain
           </p>
         </div>
       </div>
     </div>
   );
 };
+
+// ── Flow Step Indicator ──
+function FlowStep({
+  label,
+  state,
+}: {
+  label: string;
+  state: "pending" | "active" | "done";
+}) {
+  return (
+    <div className={`flow-step ${state}`}>
+      <span className="flow-step-icon">
+        {state === "done" ? "✅" : state === "active" ? "⏳" : "⬜"}
+      </span>
+      <span className="flow-step-label">{label}</span>
+    </div>
+  );
+}

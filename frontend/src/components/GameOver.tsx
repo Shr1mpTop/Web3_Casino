@@ -2,9 +2,17 @@ import React, { useEffect } from "react";
 import { BattleResult } from "../engine/battleEngine";
 import { soundManager } from "../utils/soundManager";
 
+const EXPLORER_BASE =
+  import.meta.env.VITE_BLOCK_EXPLORER || "https://sepolia.etherscan.io";
+const WIN_MULTIPLIER = Number(import.meta.env.VITE_WIN_MULTIPLIER || "1.9");
+
 interface GameOverProps {
   battleResult: BattleResult;
-  betAmount: number;
+  betAmount: string; // ETH string
+  payoutAmount: string | null; // ETH string from contract
+  txHash: `0x${string}` | null;
+  settleTxHash: `0x${string}` | null;
+  requestId: bigint | null;
   onPlayAgain: () => void;
   onReturnHome: () => void;
 }
@@ -12,6 +20,10 @@ interface GameOverProps {
 export const GameOver: React.FC<GameOverProps> = ({
   battleResult,
   betAmount,
+  payoutAmount,
+  txHash,
+  settleTxHash,
+  requestId,
   onPlayAgain,
   onReturnHome,
 }) => {
@@ -33,27 +45,18 @@ export const GameOver: React.FC<GameOverProps> = ({
     } else if (!isDraw) {
       soundManager.playDefeat();
     }
-
-    // Play game over background music
     soundManager.playGameOverMusic();
-
     return () => {
       soundManager.stopBackgroundMusic();
     };
   }, [playerWon, isDraw]);
 
-  const diff = { color: "#ffd700", icon: "⚔", name: "On-Chain", multiplier: 1.9, drawMultiplier: 1 };
   const resultText = isDraw ? "DRAW" : playerWon ? "VICTORY" : "DEFEAT";
   const resultClass = isDraw ? "draw" : playerWon ? "victory" : "defeat";
 
-  // Calculate payout (5% house edge, matching contract)
-  const multiplier = isDraw
-    ? diff.drawMultiplier
-    : playerWon
-      ? diff.multiplier
-      : 0;
-  const payout = Math.floor(betAmount * multiplier);
-  const profit = payout - betAmount;
+  const betEth = parseFloat(betAmount) || 0;
+  const payoutEth = payoutAmount ? parseFloat(payoutAmount) : 0;
+  const profitEth = payoutEth - betEth;
 
   // Count major arcana appearances
   const majorCount = rounds.reduce((acc, r) => {
@@ -79,9 +82,9 @@ export const GameOver: React.FC<GameOverProps> = ({
               : "The cards have spoken."}
         </div>
 
-        {/* Difficulty badge */}
-        <div className="gameover-difficulty" style={{ color: diff.color }}>
-          {diff.icon} {diff.name} — ×{diff.multiplier} Payout
+        {/* On-chain badge */}
+        <div className="gameover-difficulty" style={{ color: "#ffd700" }}>
+          ⚔ On-Chain — ×{WIN_MULTIPLIER} Payout
         </div>
 
         {/* Final HP comparison */}
@@ -113,23 +116,23 @@ export const GameOver: React.FC<GameOverProps> = ({
           </div>
         </div>
 
-        {/* Payout */}
+        {/* Payout — ETH amounts */}
         <div className="gameover-payout">
           <div className="payout-row">
             <span>Bet</span>
-            <span>{betAmount} tokens</span>
+            <span>⟠ {betEth.toFixed(4)} ETH</span>
           </div>
           <div className="payout-row">
-            <span>Multiplier</span>
-            <span>×{multiplier}</span>
+            <span>Payout</span>
+            <span>⟠ {payoutEth.toFixed(4)} ETH</span>
           </div>
           <div
-            className={`payout-row total ${profit > 0 ? "profit" : profit < 0 ? "loss" : ""}`}
+            className={`payout-row total ${profitEth > 0 ? "profit" : profitEth < 0 ? "loss" : ""}`}
           >
             <span>Result</span>
             <span>
-              {profit > 0 ? "+" : ""}
-              {profit} tokens
+              {profitEth > 0 ? "+" : ""}
+              {profitEth.toFixed(4)} ETH
             </span>
           </div>
         </div>
@@ -167,22 +170,69 @@ export const GameOver: React.FC<GameOverProps> = ({
           </div>
         </div>
 
-        {/* Provably Fair verification */}
+        {/* Provably Fair + On-Chain Verification */}
         <div className="gameover-verification">
-          <h3>🔮 Provably Fair</h3>
+          <h3>🔮 Provably Fair — On-Chain</h3>
+
           <div className="verification-field">
-            <span className="verification-label">VRF Seed</span>
-            <code className="verification-value">{seed}</code>
+            <span className="verification-label">Chainlink VRF Seed</span>
+            <code className="verification-value">
+              {seed
+                ? seed.length > 40
+                  ? seed.slice(0, 20) + "..." + seed.slice(-20)
+                  : seed
+                : "—"}
+            </code>
           </div>
+
+          {requestId && (
+            <div className="verification-field">
+              <span className="verification-label">VRF Request ID</span>
+              <code className="verification-value">
+                {requestId.toString().slice(0, 20)}...
+              </code>
+            </div>
+          )}
+
+          {txHash && (
+            <div className="verification-field">
+              <span className="verification-label">Bet TX</span>
+              <a
+                className="verification-link"
+                href={`${EXPLORER_BASE}/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {txHash.slice(0, 10)}...{txHash.slice(-8)} ↗
+              </a>
+            </div>
+          )}
+
+          {settleTxHash && (
+            <div className="verification-field">
+              <span className="verification-label">Settle TX</span>
+              <a
+                className="verification-link"
+                href={`${EXPLORER_BASE}/tx/${settleTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {settleTxHash.slice(0, 10)}...{settleTxHash.slice(-8)} ↗
+              </a>
+            </div>
+          )}
+
           <div className="verification-field">
             <span className="verification-label">Events</span>
             <code className="verification-value">
               {majorCount} Major Arcana appeared
             </code>
           </div>
+
           <p className="verification-hint">
-            This battle is provably fair — the same VRF seed always produces the
-            exact same result, verifiable on-chain.
+            This battle is provably fair — the Chainlink VRF seed determines all
+            cards, and the same seed always produces the exact same result.
+            Verify on Etherscan.
           </p>
         </div>
 
