@@ -53,6 +53,7 @@ contract FateEcho is VRFConsumerBaseV2Plus {
         uint256 betAmount;
         uint256 seed;
         bool playerWon;
+        bool isDraw;
         uint256 playerFinalHp;
         uint256 enemyFinalHp;
         uint256 payout;
@@ -164,23 +165,37 @@ contract FateEcho is VRFConsumerBaseV2Plus {
             uint256 enemyFinalHp
         ) = _resolveBattle(game.seed);
 
+        bool isDraw = (playerFinalHp == enemyFinalHp);
         game.playerWon = playerWon;
+        game.isDraw = isDraw;
         game.playerFinalHp = playerFinalHp;
         game.enemyFinalHp = enemyFinalHp;
 
         // 计算并立即支付
         if (playerWon) {
-            uint256 payout = (game.betAmount * 2 * (100 - HOUSE_EDGE)) / 100;
-            game.payout = payout;
+            // 胜利：支付 betAmount * 2 * (100 - HOUSE_EDGE) / 100
+            uint256 winPayout = (game.betAmount * 2 * (100 - HOUSE_EDGE)) / 100;
+            game.payout = winPayout;
             game.state = GameState.Paid;
-            totalPayouts += payout;
+            totalPayouts += winPayout;
 
-            (bool success, ) = payable(msg.sender).call{value: payout}("");
+            (bool success, ) = payable(msg.sender).call{value: winPayout}("");
             require(success, "Transfer failed");
 
-            emit GamePaid(requestId, msg.sender, payout);
+            emit GamePaid(requestId, msg.sender, winPayout);
+        } else if (isDraw) {
+            // 平局：全额退款
+            game.payout = game.betAmount;
+            game.state = GameState.Paid;
+            totalPayouts += game.betAmount;
+
+            (bool success, ) = payable(msg.sender).call{value: game.betAmount}("");
+            require(success, "Transfer failed");
+
+            emit GamePaid(requestId, msg.sender, game.betAmount);
         } else {
-            game.state = GameState.Paid; // 输了也标记为已结算
+            // 败北：不退款
+            game.state = GameState.Paid;
         }
     }
 

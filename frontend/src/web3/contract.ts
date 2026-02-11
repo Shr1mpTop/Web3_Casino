@@ -23,6 +23,7 @@ export const FATE_ECHO_ABI = [
           { name: "betAmount", type: "uint256" },
           { name: "seed", type: "uint256" },
           { name: "playerWon", type: "bool" },
+          { name: "isDraw", type: "bool" },
           { name: "playerFinalHp", type: "uint256" },
           { name: "enemyFinalHp", type: "uint256" },
           { name: "payout", type: "uint256" },
