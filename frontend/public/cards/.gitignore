@@ -1,0 +1,7 @@
+# Ignore copied card images (they're generated from resources/ during build)
+*.png
+*.jpg
+*.jpeg
+
+# But keep the directory structure
+!.gitkeep

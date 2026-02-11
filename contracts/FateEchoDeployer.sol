@@ -12,7 +12,7 @@ contract FateEchoDeployer {
     // Sepolia Testnet VRF v2.5 Configuration
     address constant VRF_COORDINATOR = 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B;
     bytes32 constant KEY_HASH = 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
-    uint32 constant CALLBACK_GAS_LIMIT = 200000; // 200k：安全且经济的值
+    uint32 constant CALLBACK_GAS_LIMIT = 200000;
 
     /**
      * @notice Deploy a new FateEcho contract

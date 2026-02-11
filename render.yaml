@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: fates-echo
+    env: node
+    region: singapore  # 或选择 oregon / frankfurt
+    plan: free  # 免费套餐，可升级到 starter ($7/month)
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      # 以下环境变量需在 Render Dashboard 中配置
+      - key: NODE_VERSION
+        value: 18.18.0
+      - key: VITE_CHAIN_ID
+        sync: false
+      - key: VITE_NETWORK_NAME
+        sync: false
+      - key: VITE_RPC_URL
+        sync: false
+      - key: VITE_BLOCK_EXPLORER
+        sync: false
+      - key: VITE_FATE_ECHO_CONTRACT_ADDRESS
+        sync: false
+      - key: VITE_VRF_COORDINATOR
+        sync: false
+      - key: VITE_VRF_KEY_HASH
+        sync: false
+      - key: VITE_VRF_SUBSCRIPTION_ID
+        sync: false
+      - key: VITE_VRF_CALLBACK_GAS_LIMIT
+        sync: false
+      - key: VITE_MIN_BET
+        sync: false
+      - key: VITE_MAX_BET
+        sync: false
+      - key: VITE_HOUSE_EDGE
+        sync: false
+      - key: VITE_WIN_MULTIPLIER
+        sync: false
