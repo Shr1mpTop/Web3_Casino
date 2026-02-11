@@ -5,19 +5,23 @@ import "./FateEcho.sol";
 
 /**
  * @title FateEcho Deployment Helper
- * @notice Helper contract for deploying FateEcho with correct VRF parameters
+ * @notice Helper contract for deploying FateEcho with correct VRF v2.5 parameters
+ * @dev 仅供参考，建议直接在 Remix 部署 FateEcho.sol
  */
 contract FateEchoDeployer {
-    // Sepolia Testnet VRF Configuration
-    address constant VRF_COORDINATOR = 0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625;
-    bytes32 constant KEY_HASH = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
-    uint64 constant SUBSCRIPTION_ID = 1234; // Replace with your actual subscription ID
+    // Sepolia Testnet VRF v2.5 Configuration
+    address constant VRF_COORDINATOR = 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B;
+    bytes32 constant KEY_HASH = 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
     uint32 constant CALLBACK_GAS_LIMIT = 500000;
 
-    function deployFateEcho() external returns (address) {
+    /**
+     * @notice Deploy a new FateEcho contract
+     * @param subscriptionId Your Chainlink VRF subscription ID (uint256)
+     */
+    function deployFateEcho(uint256 subscriptionId) external returns (address) {
         FateEcho fateEcho = new FateEcho(
             VRF_COORDINATOR,
-            SUBSCRIPTION_ID,
+            subscriptionId,
             KEY_HASH,
             CALLBACK_GAS_LIMIT
         );

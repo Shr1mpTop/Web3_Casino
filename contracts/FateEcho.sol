@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 
 /**
  * @title Fate's Echo - Provably Fair Tarot Battle
  * @notice A blockchain-based tarot card battle game using Chainlink VRF
  * @dev Implements deterministic battle resolution based on VRF-generated seeds
  */
-contract FateEcho is VRFConsumerBaseV2 {
+contract FateEcho is VRFConsumerBaseV2Plus {
     // Chainlink VRF Configuration
-    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
-    uint64 private immutable i_subscriptionId;
+    uint256 private immutable i_subscriptionId;
     bytes32 private immutable i_keyHash;
     uint32 private immutable i_callbackGasLimit;
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
@@ -69,6 +68,7 @@ contract FateEcho is VRFConsumerBaseV2 {
     address public immutable owner;
     uint256 public totalVolume;
     uint256 public totalPayouts;
+    uint256 public totalGames;
 
     // Modifiers
     modifier onlyOwner() {
@@ -84,17 +84,16 @@ contract FateEcho is VRFConsumerBaseV2 {
     /**
      * @notice Constructor
      * @param vrfCoordinator Address of the VRF Coordinator
-     * @param subscriptionId Chainlink subscription ID
+     * @param subscriptionId Chainlink subscription ID (uint256)
      * @param keyHash Gas lane key hash
      * @param callbackGasLimit Gas limit for callback
      */
     constructor(
         address vrfCoordinator,
-        uint64 subscriptionId,
+        uint256 subscriptionId,
         bytes32 keyHash,
         uint32 callbackGasLimit
-    ) VRFConsumerBaseV2(vrfCoordinator) {
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinator);
+    ) VRFConsumerBaseV2Plus(vrfCoordinator) {
         i_subscriptionId = subscriptionId;
         i_keyHash = keyHash;
         i_callbackGasLimit = callbackGasLimit;
@@ -106,12 +105,15 @@ contract FateEcho is VRFConsumerBaseV2 {
      * @return requestId The VRF request ID
      */
     function playGame() external payable validBet(msg.value) returns (uint256 requestId) {
-        requestId = i_vrfCoordinator.requestRandomWords(
-            i_keyHash,
-            i_subscriptionId,
-            REQUEST_CONFIRMATIONS,
-            i_callbackGasLimit,
-            NUM_WORDS
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: i_keyHash,
+                subId: i_subscriptionId,
+                requestConfirmations: REQUEST_CONFIRMATIONS,
+                callbackGasLimit: i_callbackGasLimit,
+                numWords: NUM_WORDS,
+                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+            })
         );
 
         games[requestId] = GameResult({
@@ -129,6 +131,7 @@ contract FateEcho is VRFConsumerBaseV2 {
 
         playerGames[msg.sender].push(requestId);
         totalVolume += msg.value;
+        totalGames++;
 
         emit GameRequested(requestId, msg.sender, msg.value);
     }
@@ -138,7 +141,7 @@ contract FateEcho is VRFConsumerBaseV2 {
      * @param requestId The request ID
      * @param randomWords Array of random words
      */
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
         GameResult storage game = games[requestId];
         require(game.state == GameState.Pending, "Game not pending");
         require(game.player != address(0), "Game not found");
@@ -224,9 +227,7 @@ contract FateEcho is VRFConsumerBaseV2 {
         uint256 balance,
         uint256 gameCount
     ) {
-        uint256 count = 0;
-        // Count total games (simplified - in production, maintain a counter)
-        return (totalVolume, totalPayouts, address(this).balance, count);
+        return (totalVolume, totalPayouts, address(this).balance, totalGames);
     }
 
     // ─── Private Functions ─────────────────────────────────────────────────────
@@ -310,8 +311,8 @@ contract FateEcho is VRFConsumerBaseV2 {
             return _resolveMajorVsMinor(pCardId, eCardId, true);
         } else if (eIsMajor) {
             // Enemy major vs player minor
-            (eDmg, pDmg, eHeal, pHeal) = _resolveMajorVsMinor(eCardId, pCardId, false);
-            return (pDmg, eDmg, pHeal, eHeal);
+            // _resolveMajorVsMinor already handles perspective via majorIsPlayer flag
+            return _resolveMajorVsMinor(eCardId, pCardId, false);
         } else {
             // Both minor - standard combat
             return _resolveMinorVsMinor(pCardId, eCardId);
